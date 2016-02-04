@@ -2,9 +2,9 @@
 using System.Drawing;
 using Grasshopper.Kernel;
 
-namespace Beta.Speckle
+namespace BetaSpeckle
 {
-    public class Beta.SpeckleInfo : GH_AssemblyInfo
+  public class BetaSpeckleInfo : GH_AssemblyInfo
   {
     public override string Name
     {

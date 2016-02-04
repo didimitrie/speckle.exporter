@@ -18,7 +18,7 @@
 
 using System.Collections.Generic;
 
-namespace Beta.Speckle
+namespace BetaSpeckle
 {
     internal class SuperProperty
     {

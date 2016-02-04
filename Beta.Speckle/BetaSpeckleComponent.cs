@@ -29,8 +29,12 @@ using Rhino.Geometry;
 using Newtonsoft.Json;
 using System.Linq;
 using Grasshopper.Kernel.Types;
+using System.IO;
+using Grasshopper;
+using System.Windows.Forms;
+using System.Drawing;
 
-namespace Beta.Speckle
+namespace BetaSpeckle
 {
     public class BetaSpeckleComponent : GH_Component
     {
@@ -41,15 +45,40 @@ namespace Beta.Speckle
 
         // IMPORTANT VARIABLES
 
+        // Part 0: GH doc + folders
+        GH_Document GrasshopperDocument;
+        IGH_Component Component;
+
+        string folderLocation = @"c:\temp";
+
         // Part 1: lists and stuff
 
         // holds all the possible slider combinations: list[ [p1v1, p2v1, p3v1], [p1v2, p2v1, p3v1], ... ]
         List<List<double>> sliderValues = new List<List<double>>();
 
+        // this lot - no idea; it's late.
+        List<string> sliderNames;
+        List<List<double>> myMatrix;
+        List<List<System.Object>> geometries;
+        List<string> geometrySets;
+        List<KeyValuePair> kvpairs = new List<KeyValuePair>();
+        List<SuperProperty> myProperties = new List<SuperProperty>();
+
         // Part 2: other params
-        
+
         // How many values we split up a double slider range( [min, max], MAXVALUES )
         public int MAXVALUES = 6;
+        public string STATUS = "waiting";
+        public int instanceCount = -1;
+        public int currentCount = 0;
+        public string currentInstanceName = "";
+
+        // Part 3: random
+        public Form _form;
+        private bool solve = false;
+
+
+
 
 
         /// <summary>
@@ -87,10 +116,49 @@ namespace Beta.Speckle
             pManager.AddTextParameter("INFO", "INFO", "You should really check here for information", GH_ParamAccess.item);
         }
 
-
         protected override void SolveInstance(IGH_DataAccess DA)
         {
+            // setup basics
+            Component = this;
+            GrasshopperDocument = Instances.ActiveCanvas.Document;
 
+            // create a folder that we're going to dump data to
+            checkAndMakeFolder();
+
+            geometries = new List<List<System.Object>>();
+            Kvpairs = new List<KeyValuePair>();
+
+            myProperties = new List<SuperProperty>();
+
+            foreach (IGH_Param param in Component.Params.Input[3].Sources)
+            {
+
+                SuperProperty myProperty = new SuperProperty(getPanelName(param));
+                myProperties.Add(myProperty);
+
+            }
+
+            // form init
+            _form = new Form();
+            _form.FormBorderStyle = FormBorderStyle.FixedToolWindow;
+            _form.Size = new Size(300, 50);
+            _form.StartPosition = FormStartPosition.Manual;
+            _form.Text = "SPKGENERATOR 0.1.0";
+            _form.FormClosed += FormClosed;
+            Grasshopper.GUI.GH_WindowsFormUtil.CenterFormOnEditor(_form, true);
+
+            Button button = new Button();
+            button.Text = "Create Export! WARNING: Rhino and GH will freeze until all is done.";
+            button.Tag = Component;
+            button.Dock = DockStyle.Bottom;
+            button.Click += ButtonClick;
+
+            _form.Controls.Add(button);
+            _form.Show(Grasshopper.Instances.DocumentEditor);
+
+            Grasshopper.Instances.DocumentEditor.FormShepard.RegisterForm(_form);
+
+            DA.SetData(0, folderLocation);            
         }
 
  
@@ -109,7 +177,132 @@ namespace Beta.Speckle
             get { return new Guid("{22a288b4-b95d-4e77-86ae-090f92bd95f2}"); }
         }
 
+        internal List<KeyValuePair> Kvpairs
+        {
+            get
+            {
+                return kvpairs;
+            }
 
+            set
+            {
+                kvpairs = value;
+            }
+        }
+
+        public void checkAndMakeFolder()
+        {
+
+            string folderpath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            folderpath += @"\Speckle Models\" + GrasshopperDocument.DisplayName;
+
+            if ((!System.IO.Directory.Exists(folderpath)))
+            {
+                System.IO.Directory.CreateDirectory(folderpath);
+            }
+            else
+            {
+                folderpath += "-" + (Int32)(DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
+            }
+
+            folderLocation = folderpath;
+
+        }
+
+        #region Form events & Co.
+
+        private void ButtonClick(object sender, EventArgs e)
+        {
+            ///TODO
+            /// 
+            geometries = new List<List<System.Object>>();
+            geometrySets = new List<string>();
+            sliderNames = new List<string>();
+
+            STATUS = "generating";
+            currentCount = 0;
+            Button button = sender as Button;
+
+            if (button == null)
+                return;
+
+            IGH_Component component = button.Tag as IGH_Component;
+
+            if (component == null)
+                return;
+
+            GH_Document doc = component.OnPingDocument();
+
+            if (doc == null)
+            {
+                button.FindForm().Close();
+                return;
+            }
+
+            // Collect all sliders that are plugged into the first input parameter of the script component.
+            List<Grasshopper.Kernel.Special.GH_NumberSlider> sliders = new List<Grasshopper.Kernel.Special.GH_NumberSlider>();
+
+            foreach (IGH_Param param in component.Params.Input[0].Sources)
+            {
+                Grasshopper.Kernel.Special.GH_NumberSlider slider = param as Grasshopper.Kernel.Special.GH_NumberSlider;
+                if (slider != null)
+                {
+                    sliders.Add(slider);
+                    sliderNames.Add(slider.NickName);
+                }
+            }
+
+            if (sliders.Count == 0)
+                return;
+
+            // generate the Matrix File
+            myMatrix = constructMatrixFromSliders((GH_Component)component);
+
+            // update the instance count
+            instanceCount = myMatrix.Count;
+
+            // go generate stuff
+            foreach (List<double> instance in myMatrix)
+            {
+                // pause the solver while set up the sliders
+                doc.Enabled = false;
+
+                // update the currentInstanceName - top level var
+
+                currentInstanceName = "";
+
+                foreach (double tempvar in instance)
+                {
+                    currentInstanceName += tempvar + ",";
+                }
+
+
+
+                // set sliders up
+
+                for (int i = 0; i < sliders.Count; i++)
+                {
+                    Grasshopper.Kernel.Special.GH_NumberSlider mySlider = sliders[i];
+                    mySlider.Slider.Value = (decimal)instance[i];
+                }
+
+                //renable solver
+                doc.Enabled = true;
+
+                //compute new solution
+                doc.NewSolution(false);
+            }
+
+            //button.Text = geometries.Count + " <<?";
+            STATUS = "done";
+        }
+
+        private void FormClosed(object sender, EventArgs e)
+        {
+            _form = null;
+        }
+
+        #endregion
 
         /// <summary>
         /// This here handles generating all the possible combinations of the input sliders.
@@ -345,7 +538,35 @@ namespace Beta.Speckle
             return myInstance;
         }
 
+        #region doubleclickhandler
 
+        public override void CreateAttributes()
+        {
+            m_attributes = new BetaSpeckleComponentAttributes(this);
+        }
+
+        public class BetaSpeckleComponentAttributes : Grasshopper.Kernel.Attributes.GH_ComponentAttributes
+        {
+
+            public BetaSpeckleComponentAttributes(BetaSpeckleComponent owner) : base(owner)
+            {
+            }
+
+            public override Grasshopper.GUI.Canvas.GH_ObjectResponse RespondToMouseDoubleClick(Grasshopper.GUI.Canvas.GH_Canvas sender, Grasshopper.GUI.GH_CanvasMouseEvent e)
+            {
+                if ((ContentBox.Contains(e.CanvasLocation)))
+                {
+                    BetaSpeckleComponent sc = (BetaSpeckleComponent)Owner;
+                    sc.solve = true;
+                    sc.ExpireSolution(true);
+                    return Grasshopper.GUI.Canvas.GH_ObjectResponse.Handled;
+                }
+
+                return Grasshopper.GUI.Canvas.GH_ObjectResponse.Ignore;
+            }
+        }
+
+        #endregion
 
     } // class end
 }

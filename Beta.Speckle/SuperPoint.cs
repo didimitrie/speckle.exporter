@@ -21,7 +21,7 @@ using Rhino.Geometry;
 using System;
 using System.Collections.Generic;
 
-namespace Beta.Speckle
+namespace BetaSpeckle
 {
     internal class SuperPoint
     {

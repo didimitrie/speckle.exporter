@@ -8,8 +8,8 @@
     <ProjectGuid>{2ECA1A4E-5055-483B-BAD2-EDC94AFC7AF4}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Beta.Speckle</RootNamespace>
-    <AssemblyName>Beta.Speckle</AssemblyName>
+    <RootNamespace>BetaSpeckle</RootNamespace>
+    <AssemblyName>BetaSpeckle</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <IsWebBootstrapper>false</IsWebBootstrapper>

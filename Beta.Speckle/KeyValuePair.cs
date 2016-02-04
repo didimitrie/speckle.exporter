@@ -17,7 +17,7 @@
  */
 
 
-namespace Beta.Speckle
+namespace BetaSpeckle
 {
     internal class KeyValuePair
     {
