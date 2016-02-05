@@ -33,6 +33,8 @@ using System.IO;
 using Grasshopper;
 using System.Windows.Forms;
 using System.Drawing;
+using System.Threading;
+using System.Text;
 
 namespace BetaSpeckle
 {
@@ -61,7 +63,7 @@ namespace BetaSpeckle
         List<List<double>> myMatrix;
         List<List<System.Object>> geometries;
         List<string> geometrySets;
-        List<KeyValuePair> kvpairs = new List<KeyValuePair>();
+        List<SuperKVP> kvpairs = new List<SuperKVP>();
         List<SuperProperty> myProperties = new List<SuperProperty>();
 
         // Part 2: other params
@@ -74,9 +76,9 @@ namespace BetaSpeckle
         string currentInstanceName = "";
 
         // Part 3: random
-        Form _form = null;
         bool EMERGENCY_BREAK = false;
         bool solve = false;
+
 
         /// <summary>
         /// Each implementation of GH_Component must provide a public 
@@ -102,7 +104,10 @@ namespace BetaSpeckle
             pManager.AddGenericParameter("PRF", "PRF", "Performance measures: values that you evaluate your design by (area, cost, element number, etc.). ", GH_ParamAccess.list);
             pManager.AddGenericParameter("OBJ", "OBJ", "Dynamic geometry: can be breps, (coloured) meshes, curves and points.", GH_ParamAccess.list);
             pManager.AddGenericParameter("STA", "STA", "Static geometry: objects that do not change (ie, context)", GH_ParamAccess.list);
-     
+
+            pManager[1].Optional = true;
+            pManager[2].Optional = true;
+            pManager[3].Optional = true;
         }
 
         /// <summary>
@@ -111,6 +116,8 @@ namespace BetaSpeckle
         protected override void RegisterOutputParams(GH_Component.GH_OutputParamManager pManager)
         {
             pManager.AddTextParameter("INFO", "INFO", "You should really check here for information", GH_ParamAccess.item);
+            pManager.AddTextParameter("LOLZ", "INFO", "You should really check here for information", GH_ParamAccess.item);
+
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -124,11 +131,12 @@ namespace BetaSpeckle
                 GrasshopperDocument = Instances.ActiveCanvas.Document;
 
                 // create a folder that we're going to dump data to
+              
                 checkAndMakeFolder();
 
                 // part of some obscure ritual code
                 geometries = new List<List<System.Object>>();
-                Kvpairs = new List<KeyValuePair>();
+                kvpairs = new List<SuperKVP>();
 
                 myProperties = new List<SuperProperty>();
 
@@ -162,18 +170,52 @@ namespace BetaSpeckle
 
                 double size = (System.Text.ASCIIEncoding.Unicode.GetByteCount(test) / 1024f) / 1024f;
 
-                string mess = "You have " + blrr + " instances. An average file size is " + size + " mb. This means the total pre-compression export file will be around " + size * blrr + " mb.";
+                string mess = "You have " + blrr + " instances. An average file size is " + Math.Round(size, 2) + " mb. This means the total pre-compression export file will be around " + Math.Round(size * blrr, 2) + " mb.";
                 DA.SetData(0, mess);
 
             }
             else
             {
                 if (EMERGENCY_BREAK) return;
-                // run through the iterations!
+
+                // running through the iterations - so store and save
+                List<System.Object> geoms = new List<System.Object>();
+                DA.GetDataList(2, geoms);
+
+                string path = Path.Combine(folderLocation, currentInstanceName + ".json");
+                DA.SetData(1, path);
+                writeFile(JsonConvert.SerializeObject(translateGeometry(geoms, currentInstanceName, Component), Newtonsoft.Json.Formatting.None), path);
+
+                // get the key value pairs nicely wrapped up
+                SuperKVP myKVP = getCurrentKVP(currentInstanceName);
+
+                kvpairs.Add(myKVP);
+
+
+                //myKVP.values
+
+                string[] splitvals = myKVP.values.Split(',');
+
+                int blrrr = 0;
+
+                foreach (SuperProperty prop in myProperties)
+                {
+
+                    prop.addValue(splitvals[blrrr]);
+
+                    blrrr++;
+                }
+
+                currentCount++;
+
+                //that means we have reached the end, my friend, of the iterations - time to write the static geo and the params file
+                if (currentCount == instanceCount)
+                {
+
+                }
+
             }
-
-          
-
+            
         }
 
 
@@ -192,65 +234,103 @@ namespace BetaSpeckle
             get { return new Guid("{22a288b4-b95d-4e77-86ae-090f92bd95f2}"); }
         }
 
-        internal List<KeyValuePair> Kvpairs
+        #region utils: write file, etc.
+
+        public string RemoveSpecialCharacters(string str)
         {
-            get
+            StringBuilder sb = new StringBuilder();
+            foreach (char c in str)
             {
-                return kvpairs;
+                if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '.' || c == '_')
+                {
+                    sb.Append(c);
+                }
+            }
+            return sb.ToString();
+        }
+
+        public SuperKVP getCurrentKVP(string name)
+        {
+
+            SuperKVP myKVP;
+
+            string values = "";
+
+            foreach (IGH_Param param in Component.Params.Input[3].Sources)
+            {
+                var myprop = getPanelVal(param);
+
+                if (myprop != null)
+                {
+
+                    values += myprop + ",";
+
+                }
+
             }
 
-            set
-            {
-                kvpairs = value;
-            }
+            myKVP = new SuperKVP(name, values);
+
+            return myKVP;
+
+        }
+
+        public void writeFile(string what, string name)
+        {
+            System.IO.StreamWriter file = new System.IO.StreamWriter(name);
+            file.WriteLine(what);
+            file.Close();
+        }
+
+        public string RemoveWhitespace(string input)
+        {
+            return new string(input.ToCharArray()
+              .Where(c => !Char.IsWhiteSpace(c))
+              .ToArray());
         }
 
         public void checkAndMakeFolder()
         {
 
             string folderpath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            folderpath += @"\Speckle Models\" + GrasshopperDocument.DisplayName;
+            folderpath += @"\Speckle Models\" + GrasshopperDocument.DisplayName.ToString();
+            folderpath = RemoveSpecialCharacters(folderpath);
 
             if ((!System.IO.Directory.Exists(folderpath)))
             {
-                System.IO.Directory.CreateDirectory(folderpath);
+                System.IO.Directory.CreateDirectory(@folderpath);
             }
             else
             {
-                folderpath += "-" + (Int32)(DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
+                folderpath = Path.Combine(folderpath, "-" + (Int32)(DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds);
             }
 
             folderLocation = folderpath;
 
         }
 
+        #endregion
+
         #region Form events & Co.
 
-        private void ButtonClick(object sender, EventArgs e)
+        private void ButtonClick()
         {
-            ///TODO
-            /// 
+            /// flushing up them arrays - is it really needed though? mmm
             geometries = new List<List<System.Object>>();
             geometrySets = new List<string>();
             sliderNames = new List<string>();
 
             STATUS = "generating";
             currentCount = 0;
-            Button button = sender as Button;
-
-            if (button == null)
-                return;
-
-            IGH_Component component = button.Tag as IGH_Component;
+            IGH_Component component = Component;
 
             if (component == null)
                 return;
 
-            GH_Document doc = component.OnPingDocument();
+            GH_Document doc = GrasshopperDocument;
 
             if (doc == null)
             {
-                button.FindForm().Close();
                 return;
             }
 
@@ -283,15 +363,12 @@ namespace BetaSpeckle
                 doc.Enabled = false;
 
                 // update the currentInstanceName - top level var
-
                 currentInstanceName = "";
 
                 foreach (double tempvar in instance)
                 {
                     currentInstanceName += tempvar + ",";
                 }
-
-
 
                 // set sliders up
 
@@ -312,10 +389,7 @@ namespace BetaSpeckle
             STATUS = "done";
         }
 
-        private void FormClosed(object sender, EventArgs e)
-        {
-            _form = null;
-        }
+
 
         #endregion
 
@@ -573,6 +647,7 @@ namespace BetaSpeckle
                 {
                     BetaSpeckleComponent sc = (BetaSpeckleComponent)Owner;
                     sc.solve = true;
+                    sc.ButtonClick();
                     sc.ExpireSolution(true);
                     return Grasshopper.GUI.Canvas.GH_ObjectResponse.Handled;
                 }

@@ -19,12 +19,12 @@
 
 namespace BetaSpeckle
 {
-    internal class KeyValuePair
+    public class SuperKVP
     {
         public string key = "";
         public string values = "";
 
-        public KeyValuePair(string _key, string _values)
+        public SuperKVP(string _key, string _values)
         {
             key = _key;
             values = _values;
