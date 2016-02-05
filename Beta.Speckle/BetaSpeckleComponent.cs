@@ -42,7 +42,8 @@ namespace BetaSpeckle
     {
 
         /// 
-        /// HIC SVNT DRACONES (aka bad code)
+        /// HIC SVNT DRACONES (aka really bad code)
+        /// not sure whether to rewrite or keep patching :/
         /// 
 
         // IMPORTANT VARIABLES
@@ -65,6 +66,8 @@ namespace BetaSpeckle
         List<string> geometrySets;
         List<SuperKVP> kvpairs = new List<SuperKVP>();
         List<SuperProperty> myProperties = new List<SuperProperty>();
+
+        dynamic OUTFILE;
 
         // Part 2: other params
 
@@ -170,7 +173,9 @@ namespace BetaSpeckle
 
                 double size = (System.Text.ASCIIEncoding.Unicode.GetByteCount(test) / 1024f) / 1024f;
 
-                string mess = "You have " + blrr + " instances. An average file size is " + Math.Round(size, 2) + " mb. This means the total pre-compression export file will be around " + Math.Round(size * blrr, 2) + " mb.";
+                string mess = "You have " + blrr + " instances.\nAn average file size is " + Math.Round(size, 2) + " mb. This means the total pre-compression export file will be around " + Math.Round(size * blrr, 2) + " mb.";
+                mess += "\n ------------------\n";
+                mess += "All should be well. Double click the component on the icon and things will start rolling. \n Your file will be saved here: " + folderLocation;
                 DA.SetData(0, mess);
 
             }
@@ -211,6 +216,56 @@ namespace BetaSpeckle
                 //that means we have reached the end, my friend, of the iterations - time to write the static geo and the params file
                 if (currentCount == instanceCount)
                 {
+                    solve = false;
+
+                    // write the static geom file
+                    List<Object> staticGeo = new List<Object>();
+
+                    DA.GetDataList(3, staticGeo);
+                    string pathh = Path.Combine(folderLocation, "static.json");
+
+                    writeFile(JsonConvert.SerializeObject(translateGeometry(staticGeo, "staticGeo", Component), Newtonsoft.Json.Formatting.None), pathh);
+
+                    OUTFILE = new System.Dynamic.ExpandoObject();
+
+                    OUTFILE = new System.Dynamic.ExpandoObject();
+                    OUTFILE.meta = "ParametricSpaceExporter";
+                    OUTFILE.parameters = new List<dynamic>();
+                    OUTFILE.propNames = new List<string>();
+                    OUTFILE.kvpairs = kvpairs;
+
+
+
+                    foreach (IGH_Param param in Component.Params.Input[1].Sources)
+                    {
+                        //Print(getPanelNameAndVal(param));
+                        var myprop = getPanelNameAndVal(param);
+                        if (myprop != null)
+                        {
+                            string[] pops = myprop.Split(',');
+                            OUTFILE.propNames.Add(pops[0]);
+                        }
+                    }
+
+                    // populate the sliders
+                    int k = 0;
+                    foreach (List<double> mySliderVars in sliderValues)
+                    {
+                        dynamic Slider = new System.Dynamic.ExpandoObject();
+                        Slider.name = sliderNames.ElementAt(k++);
+                        Slider.values = mySliderVars;
+                        OUTFILE.parameters.Add(Slider);
+                    }
+
+                    OUTFILE.properties = myProperties;
+
+                    pathh = Path.Combine(folderLocation, "params.json");
+
+                    writeFile(JsonConvert.SerializeObject(OUTFILE, Newtonsoft.Json.Formatting.None), pathh);
+
+                    // unblock status flag
+                    STATUS = "waiting";
+
 
                 }
 
@@ -241,7 +296,7 @@ namespace BetaSpeckle
             StringBuilder sb = new StringBuilder();
             foreach (char c in str)
             {
-                if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '.' || c == '_')
+                if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '.' || c == '_' || c == '\\' || c == ':' || c == ' ')
                 {
                     sb.Append(c);
                 }
@@ -277,7 +332,10 @@ namespace BetaSpeckle
 
         public void writeFile(string what, string name)
         {
-            System.IO.StreamWriter file = new System.IO.StreamWriter(name);
+            string path = Path.GetFullPath(name);
+                
+
+            System.IO.StreamWriter file = new System.IO.StreamWriter(path);
             file.WriteLine(what);
             file.Close();
         }
@@ -302,7 +360,8 @@ namespace BetaSpeckle
             }
             else
             {
-                folderpath = Path.Combine(folderpath, "-" + (Int32)(DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds);
+                //folderpath += "-" + (Int32)(DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
+                System.IO.Directory.CreateDirectory(@folderpath);
             }
 
             folderLocation = folderpath;
