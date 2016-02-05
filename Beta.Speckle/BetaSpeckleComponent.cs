@@ -67,19 +67,16 @@ namespace BetaSpeckle
         // Part 2: other params
 
         // How many values we split up a double slider range( [min, max], MAXVALUES )
-        public int MAXVALUES = 6;
-        public string STATUS = "waiting";
-        public int instanceCount = -1;
-        public int currentCount = 0;
-        public string currentInstanceName = "";
+        int MAXVALUES = 6;
+        string STATUS = "waiting";
+        int instanceCount = -1;
+        int currentCount = 0;
+        string currentInstanceName = "";
 
         // Part 3: random
-        public Form _form;
-        private bool solve = false;
-
-
-
-
+        Form _form = null;
+        bool EMERGENCY_BREAK = false;
+        bool solve = false;
 
         /// <summary>
         /// Each implementation of GH_Component must provide a public 
@@ -118,50 +115,68 @@ namespace BetaSpeckle
 
         protected override void SolveInstance(IGH_DataAccess DA)
         {
-            // setup basics
-            Component = this;
-            GrasshopperDocument = Instances.ActiveCanvas.Document;
-
-            // create a folder that we're going to dump data to
-            checkAndMakeFolder();
-
-            geometries = new List<List<System.Object>>();
-            Kvpairs = new List<KeyValuePair>();
-
-            myProperties = new List<SuperProperty>();
-
-            foreach (IGH_Param param in Component.Params.Input[3].Sources)
+            if (!solve)
             {
+                // setup
 
-                SuperProperty myProperty = new SuperProperty(getPanelName(param));
-                myProperties.Add(myProperty);
+                // setup basics
+                Component = this;
+                GrasshopperDocument = Instances.ActiveCanvas.Document;
+
+                // create a folder that we're going to dump data to
+                checkAndMakeFolder();
+
+                // part of some obscure ritual code
+                geometries = new List<List<System.Object>>();
+                Kvpairs = new List<KeyValuePair>();
+
+                myProperties = new List<SuperProperty>();
+
+                foreach (IGH_Param param in Component.Params.Input[3].Sources)
+                {
+
+                    SuperProperty myProperty = new SuperProperty(getPanelName(param));
+                    myProperties.Add(myProperty);
+
+                }
+
+                myMatrix = constructMatrixFromSliders((GH_Component)Component);
+
+                var blrr = myMatrix.Count;
+
+                if(blrr >= 1500)
+                {
+                    DA.SetData(0, "You have " + blrr + " instances. That's too many. Will absolutely not run (i might break your computer)! \n Try reducing the amount of input sliders or their degree of freedom.");
+                    EMERGENCY_BREAK = true;
+                    return;
+                }
+
+                EMERGENCY_BREAK = false;
+
+
+                List<System.Object> inputObjects = new List<System.Object>();
+
+                if (!DA.GetDataList(2, inputObjects)) return;
+
+                string test = JsonConvert.SerializeObject(translateGeometry(inputObjects, currentInstanceName, Component), Newtonsoft.Json.Formatting.None);
+
+                double size = (System.Text.ASCIIEncoding.Unicode.GetByteCount(test) / 1024f) / 1024f;
+
+                string mess = "You have " + blrr + " instances. An average file size is " + size + " mb. This means the total pre-compression export file will be around " + size * blrr + " mb.";
+                DA.SetData(0, mess);
 
             }
+            else
+            {
+                if (EMERGENCY_BREAK) return;
+                // run through the iterations!
+            }
 
-            // form init
-            _form = new Form();
-            _form.FormBorderStyle = FormBorderStyle.FixedToolWindow;
-            _form.Size = new Size(300, 50);
-            _form.StartPosition = FormStartPosition.Manual;
-            _form.Text = "SPKGENERATOR 0.1.0";
-            _form.FormClosed += FormClosed;
-            Grasshopper.GUI.GH_WindowsFormUtil.CenterFormOnEditor(_form, true);
+          
 
-            Button button = new Button();
-            button.Text = "Create Export! WARNING: Rhino and GH will freeze until all is done.";
-            button.Tag = Component;
-            button.Dock = DockStyle.Bottom;
-            button.Click += ButtonClick;
-
-            _form.Controls.Add(button);
-            _form.Show(Grasshopper.Instances.DocumentEditor);
-
-            Grasshopper.Instances.DocumentEditor.FormShepard.RegisterForm(_form);
-
-            DA.SetData(0, folderLocation);            
         }
 
- 
+
         protected override System.Drawing.Bitmap Icon
         {
             get
