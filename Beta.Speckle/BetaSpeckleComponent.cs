@@ -30,11 +30,13 @@ using Newtonsoft.Json;
 using System.Linq;
 using Grasshopper.Kernel.Types;
 using System.IO;
+using System.IO.Compression;
 using Grasshopper;
 using System.Windows.Forms;
 using System.Drawing;
 using System.Threading;
 using System.Text;
+using Ionic.Zip;
 
 namespace BetaSpeckle
 {
@@ -53,6 +55,7 @@ namespace BetaSpeckle
         IGH_Component Component;
 
         string folderLocation = @"c:\temp";
+        string ghdefname = "";
 
         // Part 1: lists and stuff
 
@@ -118,9 +121,7 @@ namespace BetaSpeckle
         /// </summary>
         protected override void RegisterOutputParams(GH_Component.GH_OutputParamManager pManager)
         {
-            pManager.AddTextParameter("INFO", "INFO", "You should really check here for information", GH_ParamAccess.item);
-            pManager.AddTextParameter("LOLZ", "INFO", "You should really check here for information", GH_ParamAccess.item);
-
+            pManager.AddTextParameter("INFO", "INFO", "File statistics, etc.", GH_ParamAccess.item);
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -143,7 +144,7 @@ namespace BetaSpeckle
 
                 myProperties = new List<SuperProperty>();
 
-                foreach (IGH_Param param in Component.Params.Input[3].Sources)
+                foreach (IGH_Param param in Component.Params.Input[1].Sources)
                 {
 
                     SuperProperty myProperty = new SuperProperty(getPanelName(param));
@@ -155,9 +156,9 @@ namespace BetaSpeckle
 
                 var blrr = myMatrix.Count;
 
-                if(blrr >= 1500)
+                if(blrr >= 1234) // arbitrary limit; should possibly set higher
                 {
-                    DA.SetData(0, "You have " + blrr + " instances. That's too many. Will absolutely not run (i might break your computer)! \n Try reducing the amount of input sliders or their degree of freedom.");
+                    DA.SetData(0, "ERR: Too many instances: " + blrr + " Beta.Speckle will not run. \n Try reducing the amount of input sliders or their degree of freedom.");
                     EMERGENCY_BREAK = true;
                     return;
                 }
@@ -173,9 +174,9 @@ namespace BetaSpeckle
 
                 double size = (System.Text.ASCIIEncoding.Unicode.GetByteCount(test) / 1024f) / 1024f;
 
-                string mess = "You have " + blrr + " instances.\nAn average file size is " + Math.Round(size, 2) + " mb. This means the total pre-compression export file will be around " + Math.Round(size * blrr, 2) + " mb.";
-                mess += "\n ------------------\n";
-                mess += "All should be well. Double click the component on the icon and things will start rolling. \n Your file will be saved here: " + folderLocation;
+                string mess = "Instance count: " + blrr + "\nAn average file size: " + Math.Round(size, 2) + " mb. Total pre-compression export file will be around " + Math.Round(size * blrr, 2) + " mb.";
+                mess += "\n-----------------------------------------\n";
+                mess += "Double click the component to export.\nYour file will be saved here: " + folderLocation;
                 DA.SetData(0, mess);
 
             }
@@ -263,10 +264,28 @@ namespace BetaSpeckle
 
                     writeFile(JsonConvert.SerializeObject(OUTFILE, Newtonsoft.Json.Formatting.None), pathh);
 
-                    // unblock status flag
-                    STATUS = "waiting";
+                    
+                    // zip things up
+                    string startPath = folderLocation;
 
+                    using (ZipFile zip = new ZipFile())
+                    {
+                        zip.AddDirectory(@startPath);
+                        zip.Save(startPath + @"\"+ghdefname+".zip");
+                    }
 
+                    // delete the garbage data
+
+                    System.IO.DirectoryInfo di = new DirectoryInfo(folderLocation);
+
+                    foreach (FileInfo file in di.GetFiles())
+                    {
+                        if(!(file.Extension == ".zip"))
+                            file.Delete();
+                    }
+
+                    //Directory.Delete(startPath, true);
+                    Component.ExpireSolution(true);
                 }
 
             }
@@ -279,8 +298,8 @@ namespace BetaSpeckle
             get
             {
                 // You can add image files to your project resources and access them like this:
-                //return Resources.IconForThisComponent;
-                return null;
+                //return Resources
+                return Properties.Resources.SPK_Icon_07;
             }
         }
 
@@ -311,7 +330,7 @@ namespace BetaSpeckle
 
             string values = "";
 
-            foreach (IGH_Param param in Component.Params.Input[3].Sources)
+            foreach (IGH_Param param in Component.Params.Input[1].Sources)
             {
                 var myprop = getPanelVal(param);
 
@@ -331,11 +350,11 @@ namespace BetaSpeckle
         }
 
         public void writeFile(string what, string name)
-        {
+        { 
             string path = Path.GetFullPath(name);
                 
 
-            System.IO.StreamWriter file = new System.IO.StreamWriter(path);
+            System.IO.StreamWriter file = new System.IO.StreamWriter( path );
             file.WriteLine(what);
             file.Close();
         }
@@ -352,17 +371,12 @@ namespace BetaSpeckle
 
             string folderpath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             folderpath += @"\Speckle Models\" + GrasshopperDocument.DisplayName.ToString();
+
+            ghdefname = RemoveSpecialCharacters(GrasshopperDocument.DisplayName.ToString());
+
             folderpath = RemoveSpecialCharacters(folderpath);
 
-            if ((!System.IO.Directory.Exists(folderpath)))
-            {
-                System.IO.Directory.CreateDirectory(@folderpath);
-            }
-            else
-            {
-                //folderpath += "-" + (Int32)(DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
-                System.IO.Directory.CreateDirectory(@folderpath);
-            }
+            System.IO.Directory.CreateDirectory(@folderpath);
 
             folderLocation = folderpath;
 
@@ -444,7 +458,6 @@ namespace BetaSpeckle
                 doc.NewSolution(false);
             }
 
-            //button.Text = geometries.Count + " <<?";
             STATUS = "done";
         }
 
@@ -605,7 +618,7 @@ namespace BetaSpeckle
             myInstance.metadata.name = name;
             myInstance.metadata.properties = new List<String>();
 
-            foreach (IGH_Param param in component.Params.Input[3].Sources)
+            foreach (IGH_Param param in component.Params.Input[1].Sources)
             {
                 var myprop = getPanelNameAndVal(param);
                 if (myprop != null)
@@ -650,19 +663,22 @@ namespace BetaSpeckle
                 }
                 else if (myObj is Point3d)
                 {
-                    //Rhino.Geometry.Point3d tempers = (Rhino.Geometry.Point3d)myObj;
                     GH_Point tempers = (GH_Point)myObj;
                     SuperPoint point = new SuperPoint(tempers);
                     myInstance.geometries.Add(point);
 
                 }
-                else if ((myObj is Brep) || (myObj is Surface))
+                else if ((myObj is GH_Brep) || (myObj is GH_Surface))
                 {
+                    Mesh[] myMeshes;
+
                     Brep myFutureBrep = null;
+
                     GH_Convert.ToBrep(myObj, ref myFutureBrep, GH_Conversion.Primary);
 
-                    Mesh[] myMeshes = Mesh.CreateFromBrep(myFutureBrep, MeshingParameters.Smooth);
-
+                    if(myFutureBrep!=null) { 
+                    myMeshes = Mesh.CreateFromBrep(myFutureBrep, MeshingParameters.Smooth);
+                                 
                     if (myMeshes == null || myMeshes.Length == 0)
                     {
                         // TODO throw an error
@@ -676,7 +692,7 @@ namespace BetaSpeckle
 
                     SuperMesh mesh = new SuperMesh(temporal);
                     myInstance.geometries.Add(mesh);
-
+                    }
                 }
                 else
                 {
