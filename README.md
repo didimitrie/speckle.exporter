@@ -1,4 +1,6 @@
 # speckle.exporter
 GH Speckle Exporter Component
-Description will follow <3
+
+TODO: Add a proper readme file
+
 GNU GPL V.3
