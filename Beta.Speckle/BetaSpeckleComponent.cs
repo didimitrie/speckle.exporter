@@ -124,6 +124,37 @@ namespace BetaSpeckle
             pManager.AddTextParameter("INFO", "INFO", "File statistics, etc.", GH_ParamAccess.item);
         }
 
+        public override void AppendAdditionalMenuItems(ToolStripDropDown menu)
+        {
+            base.AppendAdditionalMenuItems(menu);
+
+            GH_DocumentObject.Menu_AppendItem(menu, @"This project is open source. Poke a fork in it on Github!", gotoGithub);
+            GH_DocumentObject.Menu_AppendItem(menu, @"-----Credits roll-----");
+            GH_DocumentObject.Menu_AppendItem(menu, @"Made with <3 at The Bartlett, UCL", gotoBartlett);
+            GH_DocumentObject.Menu_AppendItem(menu, @"Within the InnoChain project", gotoInnochain);
+            GH_DocumentObject.Menu_AppendItem(menu, @"By yours truly, @idid.", gotoTwitter);
+        }
+
+        private void gotoGithub(Object sender, EventArgs e)
+        {
+            System.Diagnostics.Process.Start(@"https://github.com/didimitrie/speckle.exporter");
+        }
+
+        private void gotoBartlett(Object sender, EventArgs e)
+        {
+            System.Diagnostics.Process.Start(@"http://www.bartlett.ucl.ac.uk/");
+        }
+
+        private void gotoInnochain(Object sender, EventArgs e)
+        {
+            System.Diagnostics.Process.Start(@"http://www.innochain.net");
+        }
+
+        private void gotoTwitter(Object sender, EventArgs e)
+        {
+            System.Diagnostics.Process.Start(@"http://twitter.com/idid");
+        }
+
         protected override void SolveInstance(IGH_DataAccess DA)
         {
             if (!solve)
@@ -156,7 +187,7 @@ namespace BetaSpeckle
 
                 var blrr = myMatrix.Count;
 
-                if(blrr >= 1234) // arbitrary limit; should possibly set higher
+                if(blrr >= 2000) // arbitrary limit; should possibly set higher
                 {
                     DA.SetData(0, "ERR: Too many instances: " + blrr + " Beta.Speckle will not run. \n Try reducing the amount of input sliders or their degree of freedom.");
                     EMERGENCY_BREAK = true;
@@ -189,7 +220,6 @@ namespace BetaSpeckle
                 DA.GetDataList(2, geoms);
 
                 string path = Path.Combine(folderLocation, currentInstanceName + ".json");
-                DA.SetData(1, path);
                 writeFile(JsonConvert.SerializeObject(translateGeometry(geoms, currentInstanceName, Component), Newtonsoft.Json.Formatting.None), path);
 
                 // get the key value pairs nicely wrapped up
@@ -197,8 +227,7 @@ namespace BetaSpeckle
 
                 kvpairs.Add(myKVP);
 
-
-                //myKVP.values
+                DA.SetData(0, "Generating: " + currentCount + " out of " + instanceCount);
 
                 string[] splitvals = myKVP.values.Split(',');
 
@@ -636,10 +665,10 @@ namespace BetaSpeckle
                     myInstance.geometries.Add(mesh);
 
                 }
-                else if ((myObj is Curve) || (myObj is GH_Line))
+                else if ((myObj is GH_Curve) || (myObj is GH_Line))
                 {
-                    Curve tempers = (Curve)myObj;
-                    Curve myCrv = tempers;
+                    GH_Curve tempers = (GH_Curve) myObj;
+                    Curve myCrv = tempers.Value;
 
                     if (myCrv.Degree == 1)
                     {
