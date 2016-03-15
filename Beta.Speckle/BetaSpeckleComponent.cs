@@ -37,6 +37,7 @@ using System.Drawing;
 using System.Threading;
 using System.Text;
 using Ionic.Zip;
+using System.Diagnostics;
 
 namespace BetaSpeckle
 {
@@ -136,7 +137,8 @@ namespace BetaSpeckle
         {
             base.AppendAdditionalMenuItems(menu);
 
-            GH_DocumentObject.Menu_AppendItem(menu, "Select location to save the file. USE AN EMPTY FOLDER!", selectFolder);
+            GH_DocumentObject.Menu_AppendItem(menu, "Select location to save the file. USE AN EMPTY FOLDER!", selectFolder, true, this.PATHISSET);
+            GH_DocumentObject.Menu_AppendSeparator(menu);
             GH_DocumentObject.Menu_AppendItem(menu, @"Allow large iterations - at your own risk!", allowLargeIterations, true, this.ALLOWLARGE);
             GH_DocumentObject.Menu_AppendSeparator(menu);
             GH_DocumentObject.Menu_AppendItem(menu, @"This project is open source. Fork it on Github!", gotoGithub);
@@ -341,7 +343,7 @@ namespace BetaSpeckle
                     using (ZipFile zip = new ZipFile())
                     {
                         zip.AddDirectory(@startPath);
-                        zip.Save(startPath + @"\"+ghdefname+".zip");
+                        zip.Save(startPath + @"\" + ghdefname + ".zip");
                     }
 
                     // delete the garbage data
@@ -354,6 +356,10 @@ namespace BetaSpeckle
                             file.Delete();
                     }
 
+                    Process.Start("explorer.exe", folderLocation);
+
+                    PATHISSET = false;
+                    folderLocation = "";
                     //Directory.Delete(startPath, true);
                     Component.ExpireSolution(true);
                 }
