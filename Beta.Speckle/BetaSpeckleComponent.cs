@@ -84,6 +84,9 @@ namespace BetaSpeckle
         // Part 3: random
         bool EMERGENCY_BREAK = false;
         bool solve = false;
+        bool ALLOWLARGE = false;
+        bool PATHISSET = false;
+        string pathToFolder = "";
 
 
         /// <summary>
@@ -111,6 +114,11 @@ namespace BetaSpeckle
             pManager.AddGenericParameter("OBJ", "OBJ", "Dynamic geometry: can be breps, (coloured) meshes, curves and points.", GH_ParamAccess.list);
             pManager.AddGenericParameter("STA", "STA", "Static geometry: objects that do not change (ie, context)", GH_ParamAccess.list);
 
+            pManager[0].DataMapping = GH_DataMapping.Flatten;
+            pManager[1].DataMapping = GH_DataMapping.Flatten;
+            pManager[2].DataMapping = GH_DataMapping.Flatten;
+            pManager[3].DataMapping = GH_DataMapping.Flatten;
+
             pManager[1].Optional = true;
             pManager[2].Optional = true;
             pManager[3].Optional = true;
@@ -128,11 +136,38 @@ namespace BetaSpeckle
         {
             base.AppendAdditionalMenuItems(menu);
 
-            GH_DocumentObject.Menu_AppendItem(menu, @"This project is open source. Poke a fork in it on Github!", gotoGithub);
-            GH_DocumentObject.Menu_AppendItem(menu, @"-----Credits roll-----");
-            GH_DocumentObject.Menu_AppendItem(menu, @"Made with <3 at The Bartlett, UCL", gotoBartlett);
-            GH_DocumentObject.Menu_AppendItem(menu, @"Within the InnoChain project", gotoInnochain);
-            GH_DocumentObject.Menu_AppendItem(menu, @"By yours truly, @idid.", gotoTwitter);
+            GH_DocumentObject.Menu_AppendItem(menu, "Select location to save the file. USE AN EMPTY FOLDER!", selectFolder);
+            GH_DocumentObject.Menu_AppendItem(menu, @"Allow large iterations - at your own risk!", allowLargeIterations, true, this.ALLOWLARGE);
+            GH_DocumentObject.Menu_AppendSeparator(menu);
+            GH_DocumentObject.Menu_AppendItem(menu, @"This project is open source. Fork it on Github!", gotoGithub);
+            GH_DocumentObject.Menu_AppendSeparator(menu);
+            GH_DocumentObject.Menu_AppendItem(menu, @"Made at UCL The Bartlett School of Architecture", gotoBartlett);
+            GH_DocumentObject.Menu_AppendItem(menu, @"Within the InnoChain Project", gotoInnochain);
+            GH_DocumentObject.Menu_AppendItem(menu, @"By Dimitrie A. Stefanescu / @idid.", gotoTwitter);
+        }
+
+        private void selectFolder(Object sender, EventArgs e)
+        {
+            FolderBrowserDialog fbd = new FolderBrowserDialog();
+            DialogResult result = fbd.ShowDialog();
+
+            if (result == DialogResult.OK) {
+
+                string[] files = Directory.GetFiles(fbd.SelectedPath);
+
+                if (files.Length > 0)
+                    System.Windows.Forms.MessageBox.Show("This is not an empty folder!");
+                else
+                {
+                    this.PATHISSET = true;
+                    this.folderLocation = fbd.SelectedPath;
+                }
+            }
+        }
+
+        private void allowLargeIterations(Object sender, EventArgs e)
+        {
+            ALLOWLARGE = !ALLOWLARGE;
         }
 
         private void gotoGithub(Object sender, EventArgs e)
@@ -163,11 +198,13 @@ namespace BetaSpeckle
 
                 // setup basics
                 Component = this;
+
                 GrasshopperDocument = Instances.ActiveCanvas.Document;
 
+                ghdefname = RemoveSpecialCharacters(GrasshopperDocument.DisplayName.ToString());
+
                 // create a folder that we're going to dump data to
-              
-                checkAndMakeFolder();
+
 
                 // part of some obscure ritual code
                 geometries = new List<List<System.Object>>();
@@ -187,7 +224,7 @@ namespace BetaSpeckle
 
                 var blrr = myMatrix.Count;
 
-                if(blrr >= 2000) // arbitrary limit; should possibly set higher
+                if((blrr >= 3000) && !ALLOWLARGE) // arbitrary limit; should possibly set higher
                 {
                     DA.SetData(0, "ERR: Too many instances: " + blrr + " Beta.Speckle will not run. \n Try reducing the amount of input sliders or their degree of freedom.");
                     EMERGENCY_BREAK = true;
@@ -207,14 +244,18 @@ namespace BetaSpeckle
 
                 string mess = "Instance count: " + blrr + "\nAn average file size: " + Math.Round(size, 2) + " mb. Total pre-compression export file will be around " + Math.Round(size * blrr, 2) + " mb.";
                 mess += "\n-----------------------------------------\n";
-                mess += "Double click the component to export.\nYour file will be saved here: " + folderLocation;
+
+                if (PATHISSET)
+                    mess += "Double click the component to export.\nYour file will be saved here: " + folderLocation;
+                else
+                    mess += "No folder specified. Please right click the component icon and select a folder where to save the export file.";
                 DA.SetData(0, mess);
 
             }
             else
             {
                 if (EMERGENCY_BREAK) return;
-
+                if (!PATHISSET) return;
                 // running through the iterations - so store and save
                 List<System.Object> geoms = new List<System.Object>();
                 DA.GetDataList(2, geoms);
@@ -417,6 +458,19 @@ namespace BetaSpeckle
 
         private void ButtonClick()
         {
+            // Sanity checks
+
+            IGH_Component component = Component;
+            GH_Document doc = GrasshopperDocument;
+
+            if (!PATHISSET)
+                return;
+            if (component == null)
+                return;
+            if (doc == null)
+                return;
+
+
             /// flushing up them arrays - is it really needed though? mmm
             geometries = new List<List<System.Object>>();
             geometrySets = new List<string>();
@@ -424,17 +478,7 @@ namespace BetaSpeckle
 
             STATUS = "generating";
             currentCount = 0;
-            IGH_Component component = Component;
-
-            if (component == null)
-                return;
-
-            GH_Document doc = GrasshopperDocument;
-
-            if (doc == null)
-            {
-                return;
-            }
+             
 
             // Collect all sliders that are plugged into the first input parameter of the script component.
             List<Grasshopper.Kernel.Special.GH_NumberSlider> sliders = new List<Grasshopper.Kernel.Special.GH_NumberSlider>();
@@ -751,6 +795,8 @@ namespace BetaSpeckle
                 {
                     BetaSpeckleComponent sc = (BetaSpeckleComponent)Owner;
                     sc.solve = true;
+                    if (!sc.PATHISSET)
+                        return Grasshopper.GUI.Canvas.GH_ObjectResponse.Ignore;
                     sc.ButtonClick();
                     sc.ExpireSolution(true);
                     return Grasshopper.GUI.Canvas.GH_ObjectResponse.Handled;
