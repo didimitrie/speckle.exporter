@@ -29,9 +29,11 @@ namespace BetaSpeckle
         public System.Guid uuid = System.Guid.NewGuid();
         public string type = "SPKL_Polyline";
         public dynamic data = new System.Dynamic.ExpandoObject();
+        public string parentGuid = "undefined";
 
-        public SuperPolyline(Polyline p, bool isClosed)
+        public SuperPolyline(Polyline p, bool isClosed, string guid)
         {
+            parentGuid = guid;
             data.uvs = "";
             data.normals = "";
             data.faces = "";

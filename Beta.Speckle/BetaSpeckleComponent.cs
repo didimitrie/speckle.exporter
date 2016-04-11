@@ -258,12 +258,23 @@ namespace BetaSpeckle
                 // running through the iterations - so store and save
 
                 List<System.Object> geoms = new List<System.Object>();
+                List<string> guids = new List<string>();
 
-                DA.GetDataList(2, geoms);
+                foreach (IGH_Param param in Component.Params.Input[2].Sources)
+                {
+                    foreach (Object myObj in param.VolatileData.AllData(false))
+                    {
+                        geoms.Add(myObj); // these are the object geometries
+                        guids.Add(param.InstanceGuid.ToString()); // these are the guids of the parent componenets
+                    }
+                }
+
+
 
                 string path = Path.Combine(FOLDERLOCATION, currentInstanceName + ".json");
 
-                writeFile(JsonConvert.SerializeObject( translateGeometry( geoms, currentInstanceName, Component ), Newtonsoft.Json.Formatting.None ), path);
+
+                writeFile(JsonConvert.SerializeObject( translateGeometry( geoms, guids,currentInstanceName, Component ), Newtonsoft.Json.Formatting.None ), path);
 
                 // get the key value pairs nicely wrapped up
                 SuperKVP myKVP = getCurrentKVP(currentInstanceName);
@@ -297,7 +308,7 @@ namespace BetaSpeckle
                     DA.GetDataList(3, staticGeo);
                     string pathh = Path.Combine(FOLDERLOCATION, "static.json");
 
-                    writeFile(JsonConvert.SerializeObject(translateGeometry(staticGeo, "staticGeo", Component), Newtonsoft.Json.Formatting.None), path);
+                    writeFile(JsonConvert.SerializeObject(translateGeometry(staticGeo, new List<string>(), "staticGeo", Component), Newtonsoft.Json.Formatting.None), path);
 
                     OUTFILE = new System.Dynamic.ExpandoObject();
 
@@ -664,7 +675,7 @@ namespace BetaSpeckle
         /// This instance subsequently gets json-ed out to a file
         /// </summary>
         
-        public static System.Dynamic.ExpandoObject translateGeometry(List<System.Object> inputObjects, String name, IGH_Component component)
+        public static System.Dynamic.ExpandoObject translateGeometry(List<System.Object> inputObjects, List<string> guids, String name, IGH_Component component)
         {
             dynamic myInstance = new System.Dynamic.ExpandoObject();
             myInstance.metadata = new System.Dynamic.ExpandoObject();
@@ -685,12 +696,21 @@ namespace BetaSpeckle
 
             myInstance.geometries = new List<System.Object>();
 
+            int k = 0;
+
             foreach (System.Object myObj in inputObjects)
             {
+                string myguid = "000";
+
+                if (name != "staticGeo")
+                    myguid = guids[k];
+
+                k++;
+
                 if (myObj is GH_Mesh)
                 {
                     GH_Mesh tempers = (GH_Mesh) myObj;
-                    SuperMesh mesh = new SuperMesh(tempers);
+                    SuperMesh mesh = new SuperMesh(tempers, myguid);
                     myInstance.geometries.Add(mesh);
 
                 }
@@ -702,7 +722,7 @@ namespace BetaSpeckle
                     if (myCrv.Degree == 1)
                     {
                         Polyline tempP; myCrv.TryGetPolyline(out tempP);
-                        SuperPolyline polyline = new SuperPolyline(tempP, false);
+                        SuperPolyline polyline = new SuperPolyline(tempP, false, myguid);
                         myInstance.geometries.Add(polyline);
 
                     }
@@ -715,14 +735,14 @@ namespace BetaSpeckle
 
                         PolylineCurve p = myCrv.ToPolyline(mainSegmentCount, subSegmentCount, maxAngleRadians, maxChordLengthRatio, maxAspectRatio, tolerance, minEdgeLength, maxEdgeLength, keepStartPoint);
                         Polyline pp; p.TryGetPolyline(out pp);
-                        myInstance.geometries.Add(new SuperPolyline(pp, isClosed));
+                        myInstance.geometries.Add(new SuperPolyline(pp, isClosed, myguid));
 
                     }
                 }
                 else if (myObj is Point3d)
                 {
                     GH_Point tempers = (GH_Point)myObj;
-                    SuperPoint point = new SuperPoint(tempers);
+                    SuperPoint point = new SuperPoint(tempers, myguid);
                     myInstance.geometries.Add(point);
 
                 }
@@ -748,7 +768,7 @@ namespace BetaSpeckle
 
                     GH_Mesh temporal = new GH_Mesh(brep_mesh);
 
-                    SuperMesh mesh = new SuperMesh(temporal);
+                    SuperMesh mesh = new SuperMesh(temporal, myguid);
                     myInstance.geometries.Add(mesh);
                     }
                 }

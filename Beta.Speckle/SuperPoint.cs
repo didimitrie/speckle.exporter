@@ -28,9 +28,11 @@ namespace BetaSpeckle
         public System.Guid uuid = System.Guid.NewGuid();
         public string type = "SPKL_Point";
         public dynamic data = new System.Dynamic.ExpandoObject();
+        public string parentGuid = "undefined";
 
-        public SuperPoint(GH_Point pp)
+        public SuperPoint(GH_Point pp, string guid)
         {
+            parentGuid = guid;
 
             Point3d p = pp.Value;
 

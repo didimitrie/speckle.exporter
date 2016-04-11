@@ -28,9 +28,11 @@ namespace BetaSpeckle
         public System.Guid uuid = System.Guid.NewGuid();
         public string type = "SPKL_Mesh";
         public dynamic data = new System.Dynamic.ExpandoObject();
+        public string parentGuid = "undefined";
 
-        public SuperMesh(GH_Mesh myMesh)
+        public SuperMesh(GH_Mesh myMesh, string guid)
         {
+            parentGuid = guid;
 
             data.uvs = "";
             data.normals = "";
