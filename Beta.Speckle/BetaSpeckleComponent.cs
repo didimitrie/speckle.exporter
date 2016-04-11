@@ -55,11 +55,10 @@ namespace BetaSpeckle
         GH_Document GrasshopperDocument;
         IGH_Component Component;
 
-        string folderLocation = @"c:\temp";
-        string ghdefname = "";
+        string FOLDERLOCATION = @"c:\temp";
+        string GHDEFNAME = "";
 
         // Part 1: lists and stuff
-
         // holds all the possible slider combinations: list[ [p1v1, p2v1, p3v1], [p1v2, p2v1, p3v1], ... ]
         List<List<double>> sliderValues = new List<List<double>>();
 
@@ -102,7 +101,7 @@ namespace BetaSpeckle
               "Export a Beta.Speckle Archive",
               "Params", "Util")
         {
-        
+            Message = "Todos: \n1. Select a folder. \n2. Plugin Parameters and Geometries. \n3. Double click to run.";
         }
 
         /// <summary>
@@ -120,8 +119,9 @@ namespace BetaSpeckle
             pManager[2].DataMapping = GH_DataMapping.Flatten;
             pManager[3].DataMapping = GH_DataMapping.Flatten;
 
+            //pManager[0].Optional = true;
             pManager[1].Optional = true;
-            pManager[2].Optional = true;
+            //pManager[2].Optional = true;
             pManager[3].Optional = true;
         }
 
@@ -137,7 +137,7 @@ namespace BetaSpeckle
         {
             base.AppendAdditionalMenuItems(menu);
 
-            GH_DocumentObject.Menu_AppendItem(menu, "Select location to save the file. USE AN EMPTY FOLDER!", selectFolder, true, this.PATHISSET);
+            GH_DocumentObject.Menu_AppendItem(menu, @"Select location to save the file - use an empty folder!", selectFolder, true, this.PATHISSET);
             GH_DocumentObject.Menu_AppendSeparator(menu);
             GH_DocumentObject.Menu_AppendItem(menu, @"Allow large iterations - at your own risk!", allowLargeIterations, true, this.ALLOWLARGE);
             GH_DocumentObject.Menu_AppendSeparator(menu);
@@ -151,6 +151,7 @@ namespace BetaSpeckle
         private void selectFolder(Object sender, EventArgs e)
         {
             FolderBrowserDialog fbd = new FolderBrowserDialog();
+            fbd.Description = "Please select an empty folder where the export file should be saved.";
             DialogResult result = fbd.ShowDialog();
 
             if (result == DialogResult.OK) {
@@ -162,7 +163,7 @@ namespace BetaSpeckle
                 else
                 {
                     this.PATHISSET = true;
-                    this.folderLocation = fbd.SelectedPath;
+                    this.FOLDERLOCATION = fbd.SelectedPath;
                 }
             }
         }
@@ -194,18 +195,16 @@ namespace BetaSpeckle
 
         protected override void SolveInstance(IGH_DataAccess DA)
         {
+
             if (!solve)
             {
                 // setup
-
                 // setup basics
                 Component = this;
 
                 GrasshopperDocument = Instances.ActiveCanvas.Document;
 
-                ghdefname = RemoveSpecialCharacters(GrasshopperDocument.DisplayName.ToString());
-
-                // create a folder that we're going to dump data to
+                GHDEFNAME = RemoveSpecialCharacters(GrasshopperDocument.DisplayName.ToString());
 
 
                 // part of some obscure ritual code
@@ -217,18 +216,19 @@ namespace BetaSpeckle
                 foreach (IGH_Param param in Component.Params.Input[1].Sources)
                 {
 
-                    SuperProperty myProperty = new SuperProperty(getPanelName(param));
+                    SuperProperty myProperty = new SuperProperty( getPanelName(param) );
                     myProperties.Add(myProperty);
+
+                    IGH_Component mycomp = (IGH_Component)param;
+                    //mycomp.Params.Output[0].Recipients
 
                 }
 
                 myMatrix = constructMatrixFromSliders((GH_Component)Component);
 
-                var blrr = myMatrix.Count;
-
-                if((blrr >= 3000) && !ALLOWLARGE) // arbitrary limit; should possibly set higher
+                if((myMatrix.Count >= 4242) && !ALLOWLARGE) // arbitrary limit; should possibly set higher
                 {
-                    DA.SetData(0, "ERR: Too many instances: " + blrr + " Beta.Speckle will not run. \n Try reducing the amount of input sliders or their degree of freedom.");
+                    DA.SetData(0, "ERR: Too many instances: " + myMatrix.Count + " Beta.Speckle will not run. \n Try reducing the amount of input sliders or their degree of freedom.");
                     EMERGENCY_BREAK = true;
                     return;
                 }
@@ -240,30 +240,30 @@ namespace BetaSpeckle
 
                 if (!DA.GetDataList(2, inputObjects)) return;
 
-                string test = JsonConvert.SerializeObject(translateGeometry(inputObjects, currentInstanceName, Component), Newtonsoft.Json.Formatting.None);
-
-                double size = (System.Text.ASCIIEncoding.Unicode.GetByteCount(test) / 1024f) / 1024f;
-
-                string mess = "Instance count: " + blrr + "\nAn average file size: " + Math.Round(size, 2) + " mb. Total pre-compression export file will be around " + Math.Round(size * blrr, 2) + " mb.";
-                mess += "\n-----------------------------------------\n";
+                this.Message = "Instance count: " + myMatrix.Count;
 
                 if (PATHISSET)
-                    mess += "Double click the component to export.\nYour file will be saved here: " + folderLocation;
+                    this.Message += "";
                 else
-                    mess += "No folder specified. Please right click the component icon and select a folder where to save the export file.";
-                DA.SetData(0, mess);
+                    this.Message += "\nNo folder specified. \nRight click and select a folder!";
+                DA.SetData(0, this.Message);
 
             }
             else
             {
+                // sanity checks
                 if (EMERGENCY_BREAK) return;
                 if (!PATHISSET) return;
+
                 // running through the iterations - so store and save
+
                 List<System.Object> geoms = new List<System.Object>();
+
                 DA.GetDataList(2, geoms);
 
-                string path = Path.Combine(folderLocation, currentInstanceName + ".json");
-                writeFile(JsonConvert.SerializeObject(translateGeometry(geoms, currentInstanceName, Component), Newtonsoft.Json.Formatting.None), path);
+                string path = Path.Combine(FOLDERLOCATION, currentInstanceName + ".json");
+
+                writeFile(JsonConvert.SerializeObject( translateGeometry( geoms, currentInstanceName, Component ), Newtonsoft.Json.Formatting.None ), path);
 
                 // get the key value pairs nicely wrapped up
                 SuperKVP myKVP = getCurrentKVP(currentInstanceName);
@@ -271,7 +271,7 @@ namespace BetaSpeckle
                 kvpairs.Add(myKVP);
 
                 DA.SetData(0, "Generating: " + currentCount + " out of " + instanceCount);
-
+                this.Message = currentCount + " / " + instanceCount;
                 string[] splitvals = myKVP.values.Split(',');
 
                 int blrrr = 0;
@@ -286,7 +286,7 @@ namespace BetaSpeckle
 
                 currentCount++;
 
-                //that means we have reached the end, my friend, of the iterations - time to write the static geo and the params file
+                //that means we have calculated all the required instances
                 if (currentCount == instanceCount)
                 {
                     solve = false;
@@ -295,9 +295,9 @@ namespace BetaSpeckle
                     List<Object> staticGeo = new List<Object>();
 
                     DA.GetDataList(3, staticGeo);
-                    string pathh = Path.Combine(folderLocation, "static.json");
+                    string pathh = Path.Combine(FOLDERLOCATION, "static.json");
 
-                    writeFile(JsonConvert.SerializeObject(translateGeometry(staticGeo, "staticGeo", Component), Newtonsoft.Json.Formatting.None), pathh);
+                    writeFile(JsonConvert.SerializeObject(translateGeometry(staticGeo, "staticGeo", Component), Newtonsoft.Json.Formatting.None), path);
 
                     OUTFILE = new System.Dynamic.ExpandoObject();
 
@@ -332,35 +332,37 @@ namespace BetaSpeckle
 
                     OUTFILE.properties = myProperties;
 
-                    pathh = Path.Combine(folderLocation, "params.json");
+                    pathh = Path.Combine(FOLDERLOCATION, "params.json");
 
                     writeFile(JsonConvert.SerializeObject(OUTFILE, Newtonsoft.Json.Formatting.None), pathh);
 
-                    
+                    //GrasshopperDocument.Write()
+
                     // zip things up
-                    string startPath = folderLocation;
+                    string startPath = FOLDERLOCATION;
 
                     using (ZipFile zip = new ZipFile())
                     {
                         zip.AddDirectory(@startPath);
-                        zip.Save(startPath + @"\" + ghdefname + ".zip");
+                        zip.Save(startPath + @"\" + GHDEFNAME + ".zip");
                     }
 
                     // delete the garbage data
 
-                    System.IO.DirectoryInfo di = new DirectoryInfo(folderLocation);
+                    System.IO.DirectoryInfo myDir = new DirectoryInfo(FOLDERLOCATION);
 
-                    foreach (FileInfo file in di.GetFiles())
+                    foreach (FileInfo file in myDir.GetFiles())
                     {
                         if(!(file.Extension == ".zip"))
                             file.Delete();
                     }
 
-                    Process.Start("explorer.exe", folderLocation);
+                    // open an explorer window to the location of the archive. 
+                    Process.Start("explorer.exe", FOLDERLOCATION);
 
                     PATHISSET = false;
-                    folderLocation = "";
-                    //Directory.Delete(startPath, true);
+                    FOLDERLOCATION = "";
+
                     Component.ExpireSolution(true);
                 }
 
@@ -373,8 +375,6 @@ namespace BetaSpeckle
         {
             get
             {
-                // You can add image files to your project resources and access them like this:
-                //return Resources
                 return Properties.Resources.SPK_Icon_07;
             }
         }
@@ -435,34 +435,13 @@ namespace BetaSpeckle
             file.Close();
         }
 
-        public string RemoveWhitespace(string input)
-        {
-            return new string(input.ToCharArray()
-              .Where(c => !Char.IsWhiteSpace(c))
-              .ToArray());
-        }
 
-        public void checkAndMakeFolder()
-        {
-
-            string folderpath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            folderpath += @"\Speckle Models\" + GrasshopperDocument.DisplayName.ToString();
-
-            ghdefname = RemoveSpecialCharacters(GrasshopperDocument.DisplayName.ToString());
-
-            folderpath = RemoveSpecialCharacters(folderpath);
-
-            System.IO.Directory.CreateDirectory(@folderpath);
-
-            folderLocation = folderpath;
-
-        }
 
         #endregion
 
-        #region Form events & Co.
+        #region Actual Solver
 
-        private void ButtonClick()
+        private void Export()
         {
             // Sanity checks
 
@@ -803,7 +782,7 @@ namespace BetaSpeckle
                     sc.solve = true;
                     if (!sc.PATHISSET)
                         return Grasshopper.GUI.Canvas.GH_ObjectResponse.Ignore;
-                    sc.ButtonClick();
+                    sc.Export();
                     sc.ExpireSolution(true);
                     return Grasshopper.GUI.Canvas.GH_ObjectResponse.Handled;
                 }
