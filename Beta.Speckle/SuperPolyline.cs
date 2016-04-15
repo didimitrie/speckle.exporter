@@ -49,5 +49,26 @@ namespace BetaSpeckle
                 data.vertices.Add(Math.Round(myPoint.X * 1, 3));
             }
         }
+
+        public SuperPolyline(GH_Line line, string guid)
+        {
+            parentGuid = guid;
+            data.uvs = "";
+            data.normals = "";
+            data.faces = "";
+            data.vertices = new List<double>();
+
+            Point3d start = line.Value.From;
+            Point3d end = line.Value.To;
+
+            data.vertices.Add(Math.Round(start.Y * 1, 3));
+            data.vertices.Add(Math.Round(start.Z * 1, 3));
+            data.vertices.Add(Math.Round(start.X * 1, 3));
+
+            data.vertices.Add(Math.Round(end.Y * 1, 3));
+            data.vertices.Add(Math.Round(end.Z * 1, 3));
+            data.vertices.Add(Math.Round(end.X * 1, 3));
+
+        }
     }
 }
