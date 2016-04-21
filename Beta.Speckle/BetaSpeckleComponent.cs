@@ -40,6 +40,8 @@ using Ionic.Zip;
 using System.Diagnostics;
 using Grasshopper.GUI.Canvas;
 using GH_IO.Serialization;
+using System.Drawing.Drawing2D;
+using Grasshopper.GUI;
 
 namespace BetaSpeckle
 {
@@ -84,16 +86,17 @@ namespace BetaSpeckle
 
         // Part 3: random
         bool EMERGENCY_BREAK = false;
-        bool SOLVE = false;
+        public bool SOLVE = false;
         bool ALLOWLARGE = false;
         bool PATHISSET = false;
+        bool allowDefExport = true;
 
         public BetaSpeckleComponent()
           : base("Beta.Speckle", "BSpk",
               "Export a Beta.Speckle Archive",
               "Params", "Util")
         {
-            Message = "Todos: \n1.Connect Parameters \n2.Connect Geometries \n3. Double click to run!";
+            //Message = "Todos: \n1.Connect Parameters \n2.Connect Geometries \n3. Double click to run!";
            
         }
 
@@ -128,21 +131,40 @@ namespace BetaSpeckle
         {
         }
 
-        public override void AppendAdditionalMenuItems(ToolStripDropDown menu)
+        public override bool AppendMenuItems(ToolStripDropDown menu)
         {
             base.AppendAdditionalMenuItems(menu);
-            GH_DocumentObject.Menu_AppendItem(menu, @"Allow large iterations - at your own risk!", allowLargeIterations, true, this.ALLOWLARGE);
+            GH_DocumentObject.Menu_AppendItem(menu, @"User Guide - Give it a read!", openHelp);
+            GH_DocumentObject.Menu_AppendSeparator(menu);
+            GH_DocumentObject.Menu_AppendItem(menu, @"Export!", menuExport);
+            GH_DocumentObject.Menu_AppendSeparator(menu);
+            GH_DocumentObject.Menu_AppendItem(menu, @"Allow Defintion Export (good for debugging)", allowGHExport, true, allowDefExport);
             GH_DocumentObject.Menu_AppendSeparator(menu);
             GH_DocumentObject.Menu_AppendItem(menu, @"Github Source | MIT License", gotoGithub);
-            GH_DocumentObject.Menu_AppendItem(menu, @"(c) UCL The Bartlett School of Architecture", gotoBartlett);
-            GH_DocumentObject.Menu_AppendItem(menu, @"(c) InnoChain Project", gotoInnochain);
-            GH_DocumentObject.Menu_AppendItem(menu, @"(c) By Dimitrie Stefanescu / @idid.", gotoTwitter);
+            GH_DocumentObject.Menu_AppendSeparator(menu);
+            GH_DocumentObject.Menu_AppendItem(menu, @"The Bartlett UCL", gotoBartlett);
+            GH_DocumentObject.Menu_AppendItem(menu, @"InnoChain", gotoInnochain);
+            GH_DocumentObject.Menu_AppendItem(menu, @"Questions: @idid", gotoTwitter);
 
+            return true;
         }
 
-        private void allowLargeIterations(Object sender, EventArgs e)
+        private void openHelp(Object sender, EventArgs e)
         {
-            ALLOWLARGE = !ALLOWLARGE;
+            System.Diagnostics.Process.Start("https://github.com/didimitrie/speckle.exporter/wiki/User-Guide");
+        }
+
+
+        private void allowGHExport(Object sender, EventArgs e)
+        {
+            allowDefExport = !allowDefExport;
+        }
+
+        private void menuExport(Object sender, EventArgs e)
+        {
+            this.SOLVE = true;
+            this.Export();
+            this.ExpireSolution(true);
         }
 
         private void gotoGithub(Object sender, EventArgs e)
@@ -165,19 +187,29 @@ namespace BetaSpeckle
             System.Diagnostics.Process.Start(@"http://twitter.com/idid");
         }
 
+        public override void AddedToDocument(GH_Document document)
+        {
+            base.AddedToDocument(document);
+            Component = this;
+
+            GrasshopperDocument = Instances.ActiveCanvas.Document;
+
+            GHDEFNAME = RemoveSpecialCharacters(GrasshopperDocument.DisplayName.ToString());
+        }
+
         protected override void SolveInstance(IGH_DataAccess DA)
         {
 
+            myMatrix = constructMatrixFromSliders((GH_Component)Component);
+            INSTANCECOUNT = myMatrix.Count;
+            if(INSTANCECOUNT > 4242)
+            {
+                this.AddRuntimeMessage(GH_RuntimeMessageLevel.Remark, "There are " + INSTANCECOUNT + " instances. That's quite a lot. Try reducing the parameter space!\nSpeckle WILL work but you might have a long wait ahead.");
+            }
+            this.Message = "# Instances:\n" + myMatrix.Count;
+
             if (!SOLVE)
             {
-                // setup
-                // setup basics
-                Component = this;
-
-                GrasshopperDocument = Instances.ActiveCanvas.Document;
-
-                GHDEFNAME = RemoveSpecialCharacters(GrasshopperDocument.DisplayName.ToString());
-
                 // part of some obscure ritual code
                 geometries = new List<List<System.Object>>();
                 kvpairs = new List<SuperKVP>();
@@ -190,27 +222,12 @@ namespace BetaSpeckle
                     myProperties.Add(myProperty);
                 }
 
-                myMatrix = constructMatrixFromSliders((GH_Component)Component);
-                if (myMatrix == null)
-                {
-                    this.AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "There's a non-slider object inputed in the sliders!");
-                    return;
-                }
-
-                if ((myMatrix.Count >= 4242) && !ALLOWLARGE) // arbitrary limit; should possibly set higher
-                {
-                    EMERGENCY_BREAK = true;
-                    this.AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "Too many instances (" + myMatrix.Count + ")! Select Allow large iterations (at your own risk).");
-                    this.Message = "# Instances: " + myMatrix.Count;
-                    return;
-                }
-
                 EMERGENCY_BREAK = false;
 
 
                 List<System.Object> inputObjects = new List<System.Object>();
 
-                this.Message = "# Instances: " + myMatrix.Count;
+                this.Message = "# Instances:\n" + myMatrix.Count;
 
                 // critical - if not set we don't know where to sthap
                 INSTANCECOUNT = myMatrix.Count;
@@ -220,7 +237,6 @@ namespace BetaSpeckle
             {
                 // sanity checks
                 if (EMERGENCY_BREAK) return;
-                if (!PATHISSET) return;
 
                 // running through the iterations - so store and save
 
@@ -258,6 +274,7 @@ namespace BetaSpeckle
 
                 currentCount++;
 
+                this.Message = currentCount + "\n---\n" + INSTANCECOUNT;
                 //that means we have calculated all the required instances
                 if (currentCount == INSTANCECOUNT)
                 {
@@ -310,11 +327,15 @@ namespace BetaSpeckle
                     writeFile(JsonConvert.SerializeObject(OUTFILE, Newtonsoft.Json.Formatting.None), pathh);
 
                     // copy/write the gh defintion in the folder   
-                    string ghSavePath = Path.Combine(FOLDERLOCATION, "def.ghx");
-                    GH_Archive myArchive = new GH_Archive();
-                    myArchive.Path = ghSavePath;
-                    myArchive.AppendObject(GrasshopperDocument, "Definition");
-                    myArchive.WriteToFile(ghSavePath, true, false);
+
+                    if (allowDefExport)
+                    { 
+                        string ghSavePath = Path.Combine(FOLDERLOCATION, "def.ghx");
+                        GH_Archive myArchive = new GH_Archive();
+                        myArchive.Path = ghSavePath;
+                        myArchive.AppendObject(GrasshopperDocument, "Definition");
+                        myArchive.WriteToFile(ghSavePath, true, false);
+                    }
 
                     // zip things up
                     string startPath = FOLDERLOCATION;
@@ -417,10 +438,24 @@ namespace BetaSpeckle
 
         #endregion
 
-        #region Actual SOLVEr
+        #region Actual SOLVER
 
-        private void Export()
+        public void Export()
         {
+
+            if (INSTANCECOUNT > 4242)
+            {
+
+                string message = "Warning: There are " + INSTANCECOUNT + " iterations.\nIt might take a lot of time and / or Rhino might crash.\nAre you sure you want to proceed?";
+
+                DialogResult largeinstancewarning = MessageBox.Show(message, "Warning", MessageBoxButtons.YesNo);
+                if (largeinstancewarning == DialogResult.No)
+                {
+                    EMERGENCY_BREAK = true;
+                    return;
+                }
+
+            }
 
             FolderBrowserDialog fbd = new FolderBrowserDialog();
             fbd.Description = "Please select an empty folder where the export file should be saved.";
@@ -437,14 +472,18 @@ namespace BetaSpeckle
                 {
                     this.PATHISSET = true;
                     this.FOLDERLOCATION = fbd.SelectedPath;
+                    GHDEFNAME = new DirectoryInfo(fbd.SelectedPath).Name;
+                    EMERGENCY_BREAK = false;
                 }
             }
 
-            if (!this.PATHISSET)
+            if (result == DialogResult.Cancel)
             {
-                MessageBox.Show("Since you cancelled, I'll do nothing. Speckle out.", "Sad Speckle :(", MessageBoxButtons.OK);
+                EMERGENCY_BREAK = true;
                 return;
             }
+
+          
 
             // Sanity checks
             IGH_Component component = Component;
@@ -838,30 +877,7 @@ namespace BetaSpeckle
             m_attributes = new BetaSpeckleComponentAttributes(this);
         }
 
-        public class BetaSpeckleComponentAttributes : Grasshopper.Kernel.Attributes.GH_ComponentAttributes
-        {
-
-            public BetaSpeckleComponentAttributes(BetaSpeckleComponent owner) : base(owner)
-            {
-            }
-
-            public override Grasshopper.GUI.Canvas.GH_ObjectResponse RespondToMouseDoubleClick(Grasshopper.GUI.Canvas.GH_Canvas sender, Grasshopper.GUI.GH_CanvasMouseEvent e)
-            {
-                if ((ContentBox.Contains(e.CanvasLocation)))
-                {
-                    BetaSpeckleComponent sc = (BetaSpeckleComponent)Owner;
-                    sc.SOLVE = true;
-
-                    // hit the export straight away, where we handle the folder selection! 
-                    sc.Export();
-                    sc.ExpireSolution(true);
-
-                    return Grasshopper.GUI.Canvas.GH_ObjectResponse.Handled;
-                }
-
-                return Grasshopper.GUI.Canvas.GH_ObjectResponse.Ignore;
-            }
-        }
+      
 
         #endregion
 
