@@ -39,6 +39,7 @@ using System.Text;
 using Ionic.Zip;
 using System.Diagnostics;
 using Grasshopper.GUI.Canvas;
+using GH_IO.Serialization;
 
 namespace BetaSpeckle
 {
@@ -92,8 +93,8 @@ namespace BetaSpeckle
               "Export a Beta.Speckle Archive",
               "Params", "Util")
         {
-            Message = "Todos: \n1. Plugin Parameters and Geometries. \n2. Double click to run!";
-            this.Attributes.Bounds.Inflate(100, 100);
+            Message = "Todos: \n1.Connect Parameters \n2.Connect Geometries \n3. Double click to run!";
+           
         }
 
         /// <summary>
@@ -116,6 +117,7 @@ namespace BetaSpeckle
             pManager[1].WireDisplay = GH_ParamWireDisplay.faint;
             pManager[2].WireDisplay = GH_ParamWireDisplay.faint;
             pManager[3].WireDisplay = GH_ParamWireDisplay.faint;
+
 
         }
 
@@ -307,7 +309,12 @@ namespace BetaSpeckle
 
                     writeFile(JsonConvert.SerializeObject(OUTFILE, Newtonsoft.Json.Formatting.None), pathh);
 
-                    //GrasshopperDocument.Write(new GH_IO.Serialization.GH_IWriter)
+                    // copy/write the gh defintion in the folder   
+                    string ghSavePath = Path.Combine(FOLDERLOCATION, "def.ghx");
+                    GH_Archive myArchive = new GH_Archive();
+                    myArchive.Path = ghSavePath;
+                    myArchive.AppendObject(GrasshopperDocument, "Definition");
+                    myArchive.WriteToFile(ghSavePath, true, false);
 
                     // zip things up
                     string startPath = FOLDERLOCATION;
