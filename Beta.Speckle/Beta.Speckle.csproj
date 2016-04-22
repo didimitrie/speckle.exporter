@@ -79,6 +79,7 @@
       <DesignTime>True</DesignTime>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
+    <Compile Include="SPK_Object.cs" />
     <Compile Include="SuperKVP.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SuperMesh.cs" />

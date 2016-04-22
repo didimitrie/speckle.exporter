@@ -23,15 +23,16 @@ using System.Collections.Generic;
 
 namespace BetaSpeckle
 {
-    internal class SuperPoint
+    internal class SuperPoint : SPK_Object
     {
-        public System.Guid uuid = System.Guid.NewGuid();
-        public string type = "SPKL_Point";
-        public dynamic data = new System.Dynamic.ExpandoObject();
-        public string parentGuid = "undefined";
+        private GH_Point source;
 
-        public SuperPoint(GH_Point pp, string guid)
+        public SuperPoint(GH_Point pp, string guid) : base()
         {
+            source = pp;
+
+            type = "SPKL_Point";
+
             parentGuid = guid;
 
             Point3d p = pp.Value;
@@ -44,6 +45,9 @@ namespace BetaSpeckle
             data.vertices.Add(Math.Round(p.Y * 1, 3));
             data.vertices.Add(Math.Round(p.Z * 1, 3));
             data.vertices.Add(Math.Round(p.X * 1, 3));
+
+            string hashText = this.type + this.parentGuid + p.ToString();
+            myHash = sha256_hash(hashText);
         }
     }
 }

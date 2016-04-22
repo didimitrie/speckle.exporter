@@ -23,25 +23,30 @@ using System.Collections.Generic;
 
 namespace BetaSpeckle
 {
-    internal class SuperMesh
+    internal class SuperMesh : SPK_Object 
     {
-        public System.Guid uuid = System.Guid.NewGuid();
-        public string type = "SPKL_Mesh";
-        public dynamic data = new System.Dynamic.ExpandoObject();
-        public string parentGuid = "undefined";
+        string uncompressedHash = "";
 
-        public SuperMesh(GH_Mesh myMesh, string guid)
+        public SuperMesh(GH_Mesh myMesh, string guid) : base()
         {
+
+            type = "SPKL_Mesh";
+
             parentGuid = guid;
 
             data.uvs = "";
             data.normals = "";
+
+            string hashText = this.type + this.parentGuid;
 
             Mesh actualMesh = myMesh.Value;
             
             // COLOURS (if any)
             if (actualMesh.VertexColors.Count > 0)
             {
+
+                hashText += "colours";
+
                 data.vertexColors = new List<int>();
                 type = "SPKL_ColorMesh";
 
@@ -53,12 +58,15 @@ namespace BetaSpeckle
             }
 
             //  VERTICES
+            int k = 0;
             data.vertices = new List<double>();
             foreach (Point3d vertex in actualMesh.Vertices)
             {
                 data.vertices.Add(Math.Round(vertex.Y * 1, 3));
                 data.vertices.Add(Math.Round(vertex.Z * 1, 3));
                 data.vertices.Add(Math.Round(vertex.X * 1, 3));
+                if (k++ < 50)
+                    hashText += vertex.ToString();
             }
 
             // FACES
@@ -85,6 +93,9 @@ namespace BetaSpeckle
                     data.faces.Add(face.D);
                 }
             }
+
+            data.uncompressedHash = hashText;
+            myHash = sha256_hash(hashText);
         }
 
         public int ColorToInt(System.Drawing.Color color)

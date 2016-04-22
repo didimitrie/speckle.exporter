@@ -91,13 +91,15 @@ namespace BetaSpeckle
         bool PATHISSET = false;
         bool allowDefExport = true;
 
+        // Part X: Testing hashes
+        HashSet<string> myHashSet = new HashSet<string>();
+
         public BetaSpeckleComponent()
           : base("Beta.Speckle", "BSpk",
               "Export a Beta.Speckle Archive",
               "Params", "Util")
         {
-            //Message = "Todos: \n1.Connect Parameters \n2.Connect Geometries \n3. Double click to run!";
-           
+            myHashSet = new HashSet<string>();
         }
 
         /// <summary>
@@ -129,8 +131,10 @@ namespace BetaSpeckle
         /// </summary>
         protected override void RegisterOutputParams(GH_Component.GH_OutputParamManager pManager)
         {
+            pManager.AddTextParameter("test", "test", "test", GH_ParamAccess.list);
         }
 
+        #region Menu Items
         public override bool AppendMenuItems(ToolStripDropDown menu)
         {
             base.AppendAdditionalMenuItems(menu);
@@ -186,6 +190,7 @@ namespace BetaSpeckle
         {
             System.Diagnostics.Process.Start(@"http://twitter.com/idid");
         }
+        #endregion
 
         public override void AddedToDocument(GH_Document document)
         {
@@ -206,6 +211,7 @@ namespace BetaSpeckle
             {
                 this.AddRuntimeMessage(GH_RuntimeMessageLevel.Remark, "There are " + INSTANCECOUNT + " instances. That's quite a lot. Try reducing the parameter space!\nSpeckle WILL work but you might have a long wait ahead.");
             }
+
             this.Message = "# Instances:\n" + myMatrix.Count;
 
             if (!SOLVE)
@@ -359,9 +365,11 @@ namespace BetaSpeckle
                     // open an explorer window to the location of the archive. 
                     Process.Start("explorer.exe", FOLDERLOCATION);
 
+                    DA.SetDataList(0, myHashSet);
+
                     PATHISSET = false;
                     FOLDERLOCATION = "";
-
+                    myHashSet = new HashSet<string>();
                     Component.ExpireSolution(true);
                 }
 
@@ -730,7 +738,7 @@ namespace BetaSpeckle
         /// This instance subsequently gets json-ed out to a file
         /// </summary>
 
-        public static System.Dynamic.ExpandoObject translateGeometry(List<System.Object> inputObjects, List<string> guids, String name, IGH_Component component)
+        public System.Dynamic.ExpandoObject translateGeometry(List<System.Object> inputObjects, List<string> guids, String name, IGH_Component component)
         {
             dynamic myInstance = new System.Dynamic.ExpandoObject();
             myInstance.metadata = new System.Dynamic.ExpandoObject();
@@ -755,119 +763,127 @@ namespace BetaSpeckle
 
             foreach (System.Object myObj in inputObjects)
             {
-                if (myObj != null)
-                {
-                    string myguid = "000";
+                string myguid = "000";
 
-                    if (name != "staticGeo")
-                        myguid = guids[k];
+                if (name != "staticGeo")
+                    myguid = guids[k];
 
-                    k++;
+                k++;
+                SPK_Object myObject = translateGeometryItem(myObj, myguid, name);
 
-                    if (myObj is GH_Mesh)
-                    {
-                        GH_Mesh tempers = (GH_Mesh)myObj;
-                        SuperMesh mesh = new SuperMesh(tempers, myguid);
-                        myInstance.geometries.Add(mesh);
+                myHashSet.Add(myObject.myHash);
 
-                    }
-                    else if ((myObj is GH_Curve))
-                    {
-                        GH_Curve tempers = (GH_Curve)myObj;
-                        Curve myCrv = tempers.Value;
-
-                        if (myCrv.Degree == 1)
-                        {
-                            Polyline tempP; myCrv.TryGetPolyline(out tempP);
-                            SuperPolyline polyline = new SuperPolyline(tempP, false, myguid);
-                            myInstance.geometries.Add(polyline);
-
-                        }
-                        else if ((myCrv.Degree == 2) || (myCrv.Degree == 3))
-                        {
-                            bool isClosed = myCrv.IsClosed;
-                            int mainSegmentCount = 0, subSegmentCount = 1;
-                            double maxAngleRadians = 0, maxChordLengthRatio = 0, maxAspectRatio = 0, tolerance = 0.1, minEdgeLength = 0, maxEdgeLength = 0;
-                            bool keepStartPoint = true;
-
-                            PolylineCurve p = myCrv.ToPolyline(mainSegmentCount, subSegmentCount, maxAngleRadians, maxChordLengthRatio, maxAspectRatio, tolerance, minEdgeLength, maxEdgeLength, keepStartPoint);
-                            Polyline pp; p.TryGetPolyline(out pp);
-                            myInstance.geometries.Add(new SuperPolyline(pp, isClosed, myguid));
-
-                        }
-                    }
-                    else if (myObj is Point3d)
-                    {
-                        GH_Point tempers = (GH_Point)myObj;
-                        SuperPoint point = new SuperPoint(tempers, myguid);
-                        myInstance.geometries.Add(point);
-
-                    }
-                    else if ((myObj is GH_Brep) || (myObj is GH_Surface))
-                    {
-                        Mesh[] myMeshes;
-
-                        Brep myFutureBrep = null;
-
-                        GH_Convert.ToBrep(myObj, ref myFutureBrep, GH_Conversion.Primary);
-
-                        if (myFutureBrep != null)
-                        {
-                            myMeshes = Mesh.CreateFromBrep(myFutureBrep, MeshingParameters.Smooth);
-
-                            if (myMeshes == null || myMeshes.Length == 0)
-                            {
-                                // TODO throw an error
-                            }
-
-                            Mesh brep_mesh = new Mesh();
-                            foreach (Mesh tempmesh in myMeshes)
-                                brep_mesh.Append(tempmesh);
-
-                            GH_Mesh temporal = new GH_Mesh(brep_mesh);
-
-                            SuperMesh mesh = new SuperMesh(temporal, myguid);
-                            myInstance.geometries.Add(mesh);
-                        }
-                    }
-                    else if (myObj is GH_Circle)
-                    {
-                        GH_Circle myCircle = myObj as GH_Circle;
-                        //NurbsCurve mycrv = myCircle.Value.ToNurbsCurve();
-                        NurbsCurve mycrv = NurbsCurve.CreateFromCircle(myCircle.Value);
-
-
-                        int mainSegmentCount = 30, subSegmentCount = 1;
-                        double maxAngleRadians = 0, maxChordLengthRatio = 0, maxAspectRatio = 0, tolerance = 0.1, minEdgeLength = 0, maxEdgeLength = 0;
-                        bool keepStartPoint = true;
-
-                        if (mycrv != null)
-                        {
-
-                            PolylineCurve p = mycrv.ToPolyline(mainSegmentCount, subSegmentCount, maxAngleRadians, maxChordLengthRatio, maxAspectRatio, tolerance, minEdgeLength, maxEdgeLength, keepStartPoint);
-
-                            Polyline pp; p.TryGetPolyline(out pp);
-                            if (pp != null)
-                                myInstance.geometries.Add(new SuperPolyline(pp, true, myguid));
-                            else
-                                myInstance.geometries.Add("Circle error");
-                        }
-                        else
-                            myInstance.geometries.Add("Circle error 2");
-                    }
-                    else if (myObj is GH_Line)
-                    {
-                        GH_Line myLine = myObj as GH_Line;
-                        myInstance.geometries.Add(new SuperPolyline(myLine, myguid));
-                    }
-                    else
-                    {
-                        myInstance.geometries.Add("error - undefined type");
-                    }
-                }
+                myInstance.geometries.Add( myObject );
             }
 
             return myInstance;
+        }
+
+
+        public SPK_Object translateGeometryItem(object myObj, string myguid, string name)
+        {
+            if (myObj != null)
+            {
+                
+                if (myObj is GH_Mesh)
+                {
+                    GH_Mesh tempers = (GH_Mesh)myObj;
+                    SuperMesh mesh = new SuperMesh(tempers, myguid);
+                     return mesh;
+
+                }
+                else if ((myObj is GH_Curve))
+                {
+                    GH_Curve tempers = (GH_Curve)myObj;
+                    Curve myCrv = tempers.Value;
+
+                    if (myCrv.Degree == 1)
+                    {
+                        Polyline tempP; myCrv.TryGetPolyline(out tempP);
+                        SuperPolyline polyline = new SuperPolyline(tempP, false, myguid);
+                        return polyline;
+
+                    }
+                    else if ((myCrv.Degree == 2) || (myCrv.Degree == 3))
+                    {
+                        bool isClosed = myCrv.IsClosed;
+                        int mainSegmentCount = 0, subSegmentCount = 1;
+                        double maxAngleRadians = 0, maxChordLengthRatio = 0, maxAspectRatio = 0, tolerance = 0.1, minEdgeLength = 0, maxEdgeLength = 0;
+                        bool keepStartPoint = true;
+
+                        PolylineCurve p = myCrv.ToPolyline(mainSegmentCount, subSegmentCount, maxAngleRadians, maxChordLengthRatio, maxAspectRatio, tolerance, minEdgeLength, maxEdgeLength, keepStartPoint);
+                        Polyline pp; p.TryGetPolyline(out pp);
+                        return new SuperPolyline(pp, isClosed, myguid);
+
+                    }
+                }
+                else if (myObj is Point3d)
+                {
+                    GH_Point tempers = (GH_Point)myObj;
+                    SuperPoint point = new SuperPoint(tempers, myguid);
+                    return point;
+
+                }
+                else if ((myObj is GH_Brep) || (myObj is GH_Surface))
+                {
+                    Mesh[] myMeshes;
+
+                    Brep myFutureBrep = null;
+
+                    GH_Convert.ToBrep(myObj, ref myFutureBrep, GH_Conversion.Primary);
+
+                    if (myFutureBrep != null)
+                    {
+                        myMeshes = Mesh.CreateFromBrep(myFutureBrep, MeshingParameters.Smooth);
+
+                        if (myMeshes == null || myMeshes.Length == 0)
+                        {
+                            // TODO throw an error
+                        }
+
+                        Mesh brep_mesh = new Mesh();
+                        foreach (Mesh tempmesh in myMeshes)
+                            brep_mesh.Append(tempmesh);
+
+                        GH_Mesh temporal = new GH_Mesh(brep_mesh);
+
+                        SuperMesh mesh = new SuperMesh(temporal, myguid);
+                        return mesh;
+                    }
+                }
+                else if (myObj is GH_Circle)
+                {
+                    GH_Circle myCircle = myObj as GH_Circle;
+                    //NurbsCurve mycrv = myCircle.Value.ToNurbsCurve();
+                    NurbsCurve mycrv = NurbsCurve.CreateFromCircle(myCircle.Value);
+
+
+                    int mainSegmentCount = 30, subSegmentCount = 1;
+                    double maxAngleRadians = 0, maxChordLengthRatio = 0, maxAspectRatio = 0, tolerance = 0.1, minEdgeLength = 0, maxEdgeLength = 0;
+                    bool keepStartPoint = true;
+
+                    if (mycrv != null)
+                    {
+                        PolylineCurve p = mycrv.ToPolyline(mainSegmentCount, subSegmentCount, maxAngleRadians, maxChordLengthRatio, maxAspectRatio, tolerance, minEdgeLength, maxEdgeLength, keepStartPoint);
+
+                        Polyline pp; p.TryGetPolyline(out pp);
+                        if (pp != null)
+                            return new SuperPolyline(pp, true, myguid);    
+                    }
+                    
+                }
+                else if (myObj is GH_Line)
+                {
+                    GH_Line myLine = myObj as GH_Line;
+
+                    return new SuperPolyline(myLine, myguid);
+                }
+                else
+                {
+                    return null;
+                }
+            }
+            return null;
         }
 
         #region doubleclickhandler

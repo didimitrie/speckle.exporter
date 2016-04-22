@@ -24,15 +24,15 @@ using System.Collections.Generic;
 
 namespace BetaSpeckle
 {
-    internal class SuperPolyline
+    internal class SuperPolyline : SPK_Object
     {
-        public System.Guid uuid = System.Guid.NewGuid();
-        public string type = "SPKL_Polyline";
-        public dynamic data = new System.Dynamic.ExpandoObject();
-        public string parentGuid = "undefined";
 
-        public SuperPolyline(Polyline p, bool isClosed, string guid)
+        private Point3d[] mypoints;
+
+        public SuperPolyline(Polyline p, bool isClosed, string guid) : base()
         {
+            type = "SPKL_Polyline";
+
             parentGuid = guid;
             data.uvs = "";
             data.normals = "";
@@ -41,13 +41,20 @@ namespace BetaSpeckle
             data.vertices = new List<double>();
 
             Point3d[] pts = p.ToArray();
+            mypoints = pts;
+
+            string hashText = this.type + this.parentGuid + data.isClosed.toString();
+            int k = 0;
 
             foreach (Point3d myPoint in pts)
             {
                 data.vertices.Add(Math.Round(myPoint.Y * 1, 3));
                 data.vertices.Add(Math.Round(myPoint.Z * 1, 3));
                 data.vertices.Add(Math.Round(myPoint.X * 1, 3));
+                if (k++ < 50) hashText += myPoint.ToString();
             }
+
+            myHash = sha256_hash(hashText);
         }
 
         public SuperPolyline(GH_Line line, string guid)
@@ -60,7 +67,7 @@ namespace BetaSpeckle
 
             Point3d start = line.Value.From;
             Point3d end = line.Value.To;
-
+            
             data.vertices.Add(Math.Round(start.Y * 1, 3));
             data.vertices.Add(Math.Round(start.Z * 1, 3));
             data.vertices.Add(Math.Round(start.X * 1, 3));
@@ -69,6 +76,12 @@ namespace BetaSpeckle
             data.vertices.Add(Math.Round(end.Z * 1, 3));
             data.vertices.Add(Math.Round(end.X * 1, 3));
 
+
+            string hashText = this.type + this.parentGuid + data.isClosed.toString();
+            hashText += start.ToString() + end.ToString();
+            myHash = sha256_hash(hashText);
+
         }
+        
     }
 }
