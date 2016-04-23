@@ -814,17 +814,17 @@ namespace BetaSpeckle
                     return point;
 
                 }
-                else if ((myObj is GH_Brep) || (myObj is GH_Surface) || (myObj is Box))
+                else if ((myObj is GH_Brep) || (myObj is GH_Surface) || (myObj is GH_Box))
                 {
                     Mesh[] myMeshes;
 
                     Brep myFutureBrep = null;
 
                     // fucking gucks
-                    if (myObj is Box)
+                    if (myObj is GH_Box)
                     {
-                        Box bb = (Box) myObj;
-                        myFutureBrep = bb.ToBrep();
+                        GH_Box bb = (GH_Box) myObj;
+                        myFutureBrep = bb.Value.ToBrep();
                     }
                     else
                     { 
