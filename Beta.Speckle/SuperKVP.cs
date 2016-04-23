@@ -17,17 +17,21 @@
  */
 
 
+using System.Collections.Generic;
+
 namespace BetaSpeckle
 {
     public class SuperKVP
     {
         public string key = "";
         public string values = "";
+        public List<string> geometries;
 
         public SuperKVP(string _key, string _values)
         {
             key = _key;
             values = _values;
+            geometries = new List<string>();
         }
     }
 }

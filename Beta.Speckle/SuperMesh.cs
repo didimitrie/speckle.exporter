@@ -25,14 +25,13 @@ namespace BetaSpeckle
 {
     internal class SuperMesh : SPK_Object 
     {
-        string uncompressedHash = "";
 
         public SuperMesh(GH_Mesh myMesh, string guid) : base()
         {
 
-            type = "SPKL_Mesh";
+            data.type = "SPKL_Mesh";
 
-            parentGuid = guid;
+            data.parentGuid = guid;
 
             data.uvs = "";
             data.normals = "";
@@ -48,7 +47,7 @@ namespace BetaSpeckle
                 hashText += "colours";
 
                 data.vertexColors = new List<int>();
-                type = "SPKL_ColorMesh";
+                data.type = "SPKL_ColorMesh";
 
                 foreach (System.Drawing.Color c in actualMesh.VertexColors)
                 {
@@ -94,7 +93,6 @@ namespace BetaSpeckle
                 }
             }
 
-            data.uncompressedHash = hashText;
             myHash = sha256_hash(hashText);
         }
 

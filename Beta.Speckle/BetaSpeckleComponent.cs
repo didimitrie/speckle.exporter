@@ -87,7 +87,6 @@ namespace BetaSpeckle
         // Part 3: random
         bool EMERGENCY_BREAK = false;
         public bool SOLVE = false;
-        bool ALLOWLARGE = false;
         bool PATHISSET = false;
         bool allowDefExport = true;
 
@@ -110,19 +109,12 @@ namespace BetaSpeckle
             pManager.AddGenericParameter("SLD", "SLD", "Parametric measures: The sliders that you want to define your parametric space with.", GH_ParamAccess.tree);
             pManager.AddGenericParameter("PRF", "PRF", "Performance measures: values that you evaluate your design by (area, cost, element number, etc.). ", GH_ParamAccess.tree);
             pManager.AddGenericParameter("OBJ", "OBJ", "Dynamic geometry: can be breps, (coloured) meshes, curves and points.", GH_ParamAccess.tree);
-            pManager.AddGenericParameter("STA", "STA", "Static geometry: objects that do not change (ie, context)", GH_ParamAccess.tree);
-
-
-            //pManager[0].Optional = true;
+           
             pManager[1].Optional = true;
-            //pManager[2].Optional = true;
-            pManager[3].Optional = true;
 
             pManager[0].WireDisplay = GH_ParamWireDisplay.faint;
             pManager[1].WireDisplay = GH_ParamWireDisplay.faint;
             pManager[2].WireDisplay = GH_ParamWireDisplay.faint;
-            pManager[3].WireDisplay = GH_ParamWireDisplay.faint;
-
 
         }
 
@@ -195,11 +187,12 @@ namespace BetaSpeckle
         public override void AddedToDocument(GH_Document document)
         {
             base.AddedToDocument(document);
+
             Component = this;
 
             GrasshopperDocument = Instances.ActiveCanvas.Document;
 
-            GHDEFNAME = RemoveSpecialCharacters(GrasshopperDocument.DisplayName.ToString());
+            //GHDEFNAME = RemoveSpecialCharacters(GrasshopperDocument.DisplayName.ToString());
         }
 
         protected override void SolveInstance(IGH_DataAccess DA)
@@ -235,7 +228,6 @@ namespace BetaSpeckle
 
                 this.Message = "# Instances:\n" + myMatrix.Count;
 
-                // critical - if not set we don't know where to sthap
                 INSTANCECOUNT = myMatrix.Count;
 
             }
@@ -260,12 +252,12 @@ namespace BetaSpeckle
 
                 string path = Path.Combine(FOLDERLOCATION, currentInstanceName + ".json");
 
-
-                writeFile(JsonConvert.SerializeObject(translateGeometry(geoms, guids, currentInstanceName, Component), Newtonsoft.Json.Formatting.None), path);
-
+                
                 // get the key value pairs nicely wrapped up
                 SuperKVP myKVP = getCurrentKVP(currentInstanceName);
                 kvpairs.Add(myKVP);
+
+                translateGeometry(geoms, guids, currentInstanceName, Component, myKVP);    
 
                 this.Message = currentCount + " / " + INSTANCECOUNT;
                 string[] splitvals = myKVP.values.Split(',');
@@ -281,42 +273,22 @@ namespace BetaSpeckle
                 currentCount++;
 
                 this.Message = currentCount + "\n---\n" + INSTANCECOUNT;
+
                 //that means we have calculated all the required instances
                 if (currentCount == INSTANCECOUNT)
                 {
                     SOLVE = false;
                     string pathh = "";
 
-                    // write the static geom file
-
-                    List<Object> staticGeo = new List<Object>();
-
-                    foreach (IGH_Param param in Component.Params.Input[3].Sources)
-                        foreach (Object myObj in param.VolatileData.AllData(true))
-                            staticGeo.Add(myObj); // these are the object geometries
-
-                    pathh = Path.Combine(FOLDERLOCATION, "static.json");
-                    writeFile(JsonConvert.SerializeObject(translateGeometry(staticGeo, new List<string>(), "staticGeo", Component), Newtonsoft.Json.Formatting.None), pathh);
-
-
                     OUTFILE = new System.Dynamic.ExpandoObject();
+
                     OUTFILE.meta = "ParametricSpaceExporter";
-                    OUTFILE.parameters = new List<dynamic>();
-                    OUTFILE.propNames = new List<string>();
+                    OUTFILE.version = "0.2";
+
                     OUTFILE.kvpairs = kvpairs;
 
-                    foreach (IGH_Param param in Component.Params.Input[1].Sources)
-                    {
-                        //Print(getPanelNameAndVal(param));
-                        var myprop = getPanelNameAndVal(param);
-                        if (myprop != null)
-                        {
-                            string[] pops = myprop.Split(',');
-                            OUTFILE.propNames.Add(pops[0]);
-                        }
-                    }
-
                     // populate the sliders
+                    OUTFILE.parameters = new List<dynamic>();
                     int k = 0;
                     foreach (List<double> mySliderVars in sliderValues)
                     {
@@ -330,7 +302,7 @@ namespace BetaSpeckle
 
                     pathh = Path.Combine(FOLDERLOCATION, "params.json");
 
-                    writeFile(JsonConvert.SerializeObject(OUTFILE, Newtonsoft.Json.Formatting.None), pathh);
+                    writeFile(JsonConvert.SerializeObject(OUTFILE, Newtonsoft.Json.Formatting.Indented), pathh);
 
                     // copy/write the gh defintion in the folder   
 
@@ -345,13 +317,14 @@ namespace BetaSpeckle
 
                     // zip things up
                     string startPath = FOLDERLOCATION;
-
+                    
+                    /*
                     using (ZipFile zip = new ZipFile())
                     {
                         zip.AddDirectory(@startPath);
                         zip.Save(startPath + @"\" + GHDEFNAME + ".zip");
                     }
-
+                    
                     // delete the garbage data
 
                     System.IO.DirectoryInfo myDir = new DirectoryInfo(FOLDERLOCATION);
@@ -361,6 +334,7 @@ namespace BetaSpeckle
                         if (!(file.Extension == ".zip"))
                             file.Delete();
                     }
+                    */
 
                     // open an explorer window to the location of the archive. 
                     Process.Start("explorer.exe", FOLDERLOCATION);
@@ -435,7 +409,6 @@ namespace BetaSpeckle
         public void writeFile(string what, string name)
         {
             string path = Path.GetFullPath(name);
-
 
             System.IO.StreamWriter file = new System.IO.StreamWriter(path);
             file.WriteLine(what);
@@ -738,7 +711,7 @@ namespace BetaSpeckle
         /// This instance subsequently gets json-ed out to a file
         /// </summary>
 
-        public System.Dynamic.ExpandoObject translateGeometry(List<System.Object> inputObjects, List<string> guids, String name, IGH_Component component)
+        public void translateGeometry(List<System.Object> inputObjects, List<string> guids, String name, IGH_Component component, SuperKVP mykvp)
         {
             dynamic myInstance = new System.Dynamic.ExpandoObject();
             myInstance.metadata = new System.Dynamic.ExpandoObject();
@@ -765,18 +738,35 @@ namespace BetaSpeckle
             {
                 string myguid = "000";
 
-                if (name != "staticGeo")
+                if (name != "staticGeo") { 
                     myguid = guids[k];
+                }
 
                 k++;
-                SPK_Object myObject = translateGeometryItem(myObj, myguid, name);
 
-                myHashSet.Add(myObject.myHash);
+                // create spk_object
+                SPK_Object myObject = translateGeometryItem(myObj, myguid, name);
+                if (myObject == null) return;
+                // add it to the hashset
+                bool isnew = myHashSet.Add(myObject.myHash);
+
+                if ( isnew )
+                {
+                    // TODO: write file with geometry
+                    myObject.serialize(FOLDERLOCATION);
+                }
+                else
+                {
+                    // TODO: nothing
+                }
+
+                // TODO: add geometry hash to KVP structure (new)
+                mykvp.geometries.Add(myObject.myHash);
 
                 myInstance.geometries.Add( myObject );
             }
 
-            return myInstance;
+            
         }
 
 
@@ -789,7 +779,7 @@ namespace BetaSpeckle
                 {
                     GH_Mesh tempers = (GH_Mesh)myObj;
                     SuperMesh mesh = new SuperMesh(tempers, myguid);
-                     return mesh;
+                    return mesh;
 
                 }
                 else if ((myObj is GH_Curve))
@@ -824,13 +814,22 @@ namespace BetaSpeckle
                     return point;
 
                 }
-                else if ((myObj is GH_Brep) || (myObj is GH_Surface))
+                else if ((myObj is GH_Brep) || (myObj is GH_Surface) || (myObj is Box))
                 {
                     Mesh[] myMeshes;
 
                     Brep myFutureBrep = null;
 
-                    GH_Convert.ToBrep(myObj, ref myFutureBrep, GH_Conversion.Primary);
+                    // fucking gucks
+                    if (myObj is Box)
+                    {
+                        Box bb = (Box) myObj;
+                        myFutureBrep = bb.ToBrep();
+                    }
+                    else
+                    { 
+                        GH_Convert.ToBrep(myObj, ref myFutureBrep, GH_Conversion.Primary);
+                    }
 
                     if (myFutureBrep != null)
                     {

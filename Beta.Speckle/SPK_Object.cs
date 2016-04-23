@@ -1,8 +1,11 @@
 ﻿using System;
+using System.IO;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Security.Cryptography;
 using System.Text;
+
+using Newtonsoft.Json;
 
 namespace BetaSpeckle
 {
@@ -10,9 +13,11 @@ namespace BetaSpeckle
     {
         IFormatter formatter = new BinaryFormatter();
 
+        //this is the data that actually gets exported
+        public dynamic data;
+
         public System.Guid uuid;
         public string type;
-        public dynamic data;
         public string parentGuid;
         public string myHash;
 
@@ -36,6 +41,20 @@ namespace BetaSpeckle
             }
 
             return Sb.ToString();
+        }
+
+        /// <summary>
+        /// Writes itself to a file
+        /// </summary>
+        public void serialize(String path)
+        {
+
+            path = Path.Combine(path, (myHash) );
+            
+            System.IO.StreamWriter file = new System.IO.StreamWriter(path);
+           
+            file.WriteLine(JsonConvert.SerializeObject(data, Formatting.Indented));
+            file.Close();
         }
 
     }

@@ -25,15 +25,11 @@ namespace BetaSpeckle
 {
     internal class SuperPoint : SPK_Object
     {
-        private GH_Point source;
-
         public SuperPoint(GH_Point pp, string guid) : base()
-        {
-            source = pp;
+        { 
+            data.type = "SPKL_Point";
 
-            type = "SPKL_Point";
-
-            parentGuid = guid;
+            data.parentGuid = guid;
 
             Point3d p = pp.Value;
 

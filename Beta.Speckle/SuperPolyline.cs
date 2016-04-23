@@ -31,9 +31,9 @@ namespace BetaSpeckle
 
         public SuperPolyline(Polyline p, bool isClosed, string guid) : base()
         {
-            type = "SPKL_Polyline";
+            data.type = "SPKL_Polyline";
 
-            parentGuid = guid;
+            data.parentGuid = guid;
             data.uvs = "";
             data.normals = "";
             data.faces = "";
@@ -43,7 +43,7 @@ namespace BetaSpeckle
             Point3d[] pts = p.ToArray();
             mypoints = pts;
 
-            string hashText = this.type + this.parentGuid + data.isClosed.toString();
+            string hashText = this.type + this.parentGuid + data.isClosed;
             int k = 0;
 
             foreach (Point3d myPoint in pts)
