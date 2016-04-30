@@ -5,11 +5,9 @@ The speckle repo is [here](https://github.com/didimitrie/future.speckle).
 
 You can see for yourself the json files being exported if you unzip the file speckle creates when exporting stuff.
 
-
-A rough breakdown of the files exported: 
-- `static.json` - contains the static geometry (objects that *do not change* if the sliders move)
-- `params.json` - contains the metadata, basically the secret sauce that makes the sliders, performance evaluation cirteria, etc.
-- `xx,yy,zz.json` - these are named after each combination of input slider values. They contain the *dynamic* geometry.
+Version 0.2 introduces a new export format:
+- `metadata` : contains all relevant model metadata. TODO: walkthrough format
+- `[1, ..., n]` : each file is one unique geometry object which dynamically gets loaded in the scene
 
 Any questions shoot [@idid](http://twitter.com/idid)
 
