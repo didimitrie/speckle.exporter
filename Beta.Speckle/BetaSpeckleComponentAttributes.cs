@@ -1,4 +1,10 @@
-﻿using Grasshopper.GUI.Canvas;
+﻿/*
+ * Beta.Speckle GH Exporter Component
+ * Copyright (C) 2016 Dimitrie A. Stefanescu (@idid) / The Bartlett School of Architecture, UCL
+ * 
+ */
+
+using Grasshopper.GUI.Canvas;
 using System;
 using System.Drawing;
 

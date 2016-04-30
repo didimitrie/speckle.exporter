@@ -1,4 +1,10 @@
-﻿using System;
+﻿/*
+ * Beta.Speckle GH Exporter Component
+ * Copyright (C) 2016 Dimitrie A. Stefanescu (@idid) / The Bartlett School of Architecture, UCL
+ * 
+ */
+
+using System;
 using System.Drawing;
 using Grasshopper.Kernel;
 

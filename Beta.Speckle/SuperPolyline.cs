@@ -2,18 +2,6 @@
  * Beta.Speckle GH Exporter Component
  * Copyright (C) 2016 Dimitrie A. Stefanescu (@idid) / The Bartlett School of Architecture, UCL
  *
- * This program is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation, either version 3 of the License, or (at your option)
- * any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of  MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 
@@ -34,8 +22,6 @@ namespace BetaSpeckle
         public SuperPolyline(Polyline p, bool isClosed, string guid, BetaSpeckleComponent parent)  : base()
         {
 
-            this.myGeometry = p.ToArray();
-
             data.type = "SPKL_Polyline";
 
             data.parentGuid = guid;
@@ -48,8 +34,10 @@ namespace BetaSpeckle
             Point3d[] pts = p.ToArray();
             mypoints = pts;
 
-            string hashText = this.type + this.parentGuid + data.isClosed;
-            int k = 0;
+            hashText = this.type + this.parentGuid + data.isClosed;
+           
+            int i = 0, count = 25 - 1, mod;
+            mod = pts.Length / count;
 
             foreach (Point3d myPoint in pts)
             {
@@ -59,10 +47,11 @@ namespace BetaSpeckle
 
                 parent.addToBBox(myPoint.Y, myPoint.Z, myPoint.X);
 
-                if (k++ < 50) hashText += myPoint.ToString();
+                if (mod < 2)
+                    hashText += myPoint.ToString();
+                else if (i % mod == 0)
+                    hashText += myPoint.ToString();
             }
-
-            //myHash = sha256_hash(hashText);
         }
 
         public SuperPolyline(GH_Line line, string guid, BetaSpeckleComponent parent) : base() 
@@ -89,10 +78,8 @@ namespace BetaSpeckle
             parent.addToBBox(start.Y, start.Z, start.X);
             parent.addToBBox(end.Y, end.Z, end.X);
 
-            string hashText = this.type + this.parentGuid + data.isClosed.toString();
+            hashText = this.type + this.parentGuid + data.isClosed.toString();
             hashText += start.ToString() + end.ToString();
-            //myHash = sha256_hash(hashText);
-
         }
         
     }

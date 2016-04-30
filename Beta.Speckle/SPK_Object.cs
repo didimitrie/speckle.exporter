@@ -1,4 +1,10 @@
-﻿using System;
+﻿/*
+ * Beta.Speckle GH Exporter Component
+ * Copyright (C) 2016 Dimitrie A. Stefanescu (@idid) / The Bartlett School of Architecture, UCL
+ * 
+ */
+
+using System;
 using System.IO;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Formatters.Binary;
@@ -15,15 +21,15 @@ namespace BetaSpeckle
     {
         IFormatter formatter = new BinaryFormatter();
 
-        //this is the data that actually gets exported
+        //this is the data that actually gets exported - false
         public dynamic data;
 
         public System.Guid uuid;
         public string type;
         public string parentGuid;
+        public string hashText;
         public string myHash;
         public int hashIndex;
-        public object myGeometry;
 
         public SPK_Object()
         {
@@ -33,7 +39,7 @@ namespace BetaSpeckle
 
         public void computeHash()
         {
-            myHash = this.getHash();
+            myHash = sha256_hash(hashText);
         }
 
         public static String sha256_hash(String value)
@@ -52,20 +58,6 @@ namespace BetaSpeckle
             return Sb.ToString();
         }
 
-        /// <summary>
-        /// Writes itself to a file
-        /// </summary>
-        public void serialize(String path)
-        {
-
-            path = Path.Combine(path, (myHash) );
-            
-            System.IO.StreamWriter file = new System.IO.StreamWriter(path);
-           
-            file.WriteLine(JsonConvert.SerializeObject(data, Formatting.None));
-            file.Close();
-        }
-
         public void serialize(String path, int index)
         {
             path = Path.Combine(path, index.ToString());
@@ -76,20 +68,5 @@ namespace BetaSpeckle
             file.Close();
         }
 
-        // http://stackoverflow.com/questions/6979718/c-sharp-object-to-string-and-back
-        public string getHash()
-        {
-            using (MemoryStream ms = new MemoryStream())
-            {
-                try {
-                    new BinaryFormatter().Serialize(ms, this.myGeometry);
-                    return sha256_hash( Convert.ToBase64String(ms.ToArray()) );
-                } catch
-                {
-                    Console.WriteLine("failed to serialize: " + this.type);
-                    return "error"; //will not serialize, exporting a nothingsess
-                }
-            }
-        }
     }
 }

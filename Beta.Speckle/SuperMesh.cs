@@ -1,19 +1,7 @@
 ﻿/*
  * Beta.Speckle GH Exporter Component
  * Copyright (C) 2016 Dimitrie A. Stefanescu (@idid) / The Bartlett School of Architecture, UCL
- *
- * This program is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation, either version 3 of the License, or (at your option)
- * any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of  MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program.  If not, see <http://www.gnu.org/licenses/>.
+ * 
  */
 
 using Grasshopper.Kernel;
@@ -30,8 +18,6 @@ namespace BetaSpeckle
 
         public SuperMesh(GH_Mesh myMesh, string guid, BetaSpeckleComponent parent) : base()
         {
-            this.myGeometry = myMesh.Value;
-
             data.type = "SPKL_Mesh";
 
             data.parentGuid = guid;
@@ -39,10 +25,12 @@ namespace BetaSpeckle
             data.uvs = "";
             data.normals = "";
 
-            string hashText = this.type + this.parentGuid;
+            hashText = this.type + this.parentGuid;
 
             Mesh actualMesh = myMesh.Value;
-            
+
+            int i = 0, count = 25, mod;
+
             // COLOURS (if any)
             if (actualMesh.VertexColors.Count > 0)
             {
@@ -52,21 +40,24 @@ namespace BetaSpeckle
                 data.vertexColors = new List<int>();
                 data.type = "SPKL_ColorMesh";
 
+                i = 0;
+                mod = actualMesh.VertexColors.Count / count;
+
                 foreach (System.Drawing.Color c in actualMesh.VertexColors)
                 {
                     c.ToString();
                     data.vertexColors.Add(ColorToInt(c));
+                    if (mod < 2)
+                        hashText += ColorToInt(c).ToString();
+                    else if (i % mod == 0)
+                        hashText += ColorToInt(c).ToString();
+                    i++;
                 }
             }
 
-            // hashing logic:
-            // if mesh.vertices.length > 50 sample 50
-            // else sample all
-            // -> need a modifier
-            // Vertices.Count / 50 = 
+            i = 0;
+            mod = actualMesh.Vertices.Count / count;
 
-            //  VERTICES
-            int k = 0, i = 0;
             data.vertices = new List<double>();
 
             hashText += actualMesh.Vertices.Count.ToString();
@@ -79,10 +70,13 @@ namespace BetaSpeckle
 
                 parent.addToBBox(vertex.Y, vertex.Z, vertex.X);
 
-                if (k++ < 50)
-                    hashText += Math.Round(vertex.Y, 3).ToString() + Math.Round(vertex.Z, 3).ToString() + Math.Round(vertex.X, 3).ToString();
-                    //hashText += vertex.ToString();
+                if (mod < 2)
+                    hashText += vertex.ToString();
+                else if (i % mod == 0)
+                    hashText += vertex.ToString();
+
                 i++;
+
             }
 
             // FACES
