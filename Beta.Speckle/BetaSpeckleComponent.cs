@@ -90,8 +90,12 @@ namespace BetaSpeckle
         bool PATHISSET = false;
         bool allowDefExport = true;
 
+        // Part Z: bounding box
+        double minx, maxx, miny, maxy, minz, maxz;
+
         // Part X: Testing hashes
         HashSet<string> myHashSet = new HashSet<string>();
+        List<string> myHashList = new List<string>();
 
         public BetaSpeckleComponent()
           : base("Beta.Speckle", "BSpk",
@@ -123,7 +127,7 @@ namespace BetaSpeckle
         /// </summary>
         protected override void RegisterOutputParams(GH_Component.GH_OutputParamManager pManager)
         {
-            pManager.AddTextParameter("test", "test", "test", GH_ParamAccess.list);
+           
         }
 
         #region Menu Items
@@ -192,6 +196,9 @@ namespace BetaSpeckle
 
             GrasshopperDocument = Instances.ActiveCanvas.Document;
 
+            minx = miny = minz = Double.MaxValue;
+            maxx = maxy = maxz = Double.MinValue;
+
             //GHDEFNAME = RemoveSpecialCharacters(GrasshopperDocument.DisplayName.ToString());
         }
 
@@ -250,7 +257,7 @@ namespace BetaSpeckle
                     }
                 }
 
-                string path = Path.Combine(FOLDERLOCATION, currentInstanceName + ".json");
+                
 
                 
                 // get the key value pairs nicely wrapped up
@@ -285,6 +292,21 @@ namespace BetaSpeckle
                     OUTFILE.meta = "ParametricSpaceExporter";
                     OUTFILE.version = "0.2";
 
+                    OUTFILE.modelname = GHDEFNAME;
+
+                    OUTFILE.modeldescription = "No description provided. Click here to add a model description!";
+
+                    OUTFILE.date = System.DateTime.Now;
+
+                    OUTFILE.bounds = new System.Dynamic.ExpandoObject();
+
+                    OUTFILE.bounds.minx = minx;
+                    OUTFILE.bounds.miny = miny;
+                    OUTFILE.bounds.minz = minz;
+                    OUTFILE.bounds.maxx = maxx;
+                    OUTFILE.bounds.maxy = maxy;
+                    OUTFILE.bounds.maxz = maxz;
+
                     OUTFILE.kvpairs = kvpairs;
 
                     // populate the sliders
@@ -300,9 +322,9 @@ namespace BetaSpeckle
 
                     OUTFILE.properties = myProperties;
 
-                    pathh = Path.Combine(FOLDERLOCATION, "params.json");
+                    pathh = Path.Combine(FOLDERLOCATION, "metadata");
 
-                    writeFile(JsonConvert.SerializeObject(OUTFILE, Newtonsoft.Json.Formatting.Indented), pathh);
+                    writeFile(JsonConvert.SerializeObject(OUTFILE, Newtonsoft.Json.Formatting.None), pathh);
 
                     // copy/write the gh defintion in the folder   
 
@@ -318,7 +340,7 @@ namespace BetaSpeckle
                     // zip things up
                     string startPath = FOLDERLOCATION;
                     
-                    /*
+                    
                     using (ZipFile zip = new ZipFile())
                     {
                         zip.AddDirectory(@startPath);
@@ -334,16 +356,17 @@ namespace BetaSpeckle
                         if (!(file.Extension == ".zip"))
                             file.Delete();
                     }
-                    */
+                    
 
                     // open an explorer window to the location of the archive. 
                     Process.Start("explorer.exe", FOLDERLOCATION);
-
-                    DA.SetDataList(0, myHashSet);
-
+                    
                     PATHISSET = false;
                     FOLDERLOCATION = "";
+
                     myHashSet = new HashSet<string>();
+                    myHashList = new List<string>();
+
                     Component.ExpireSolution(true);
                 }
 
@@ -713,25 +736,7 @@ namespace BetaSpeckle
 
         public void translateGeometry(List<System.Object> inputObjects, List<string> guids, String name, IGH_Component component, SuperKVP mykvp)
         {
-            dynamic myInstance = new System.Dynamic.ExpandoObject();
-            myInstance.metadata = new System.Dynamic.ExpandoObject();
-            myInstance.metadata.verion = "1.0";
-            myInstance.metadata.type = "Object";
-            myInstance.metadata.generator = "Instance Export";
-
-            // super important - name will link it to the correct group in three js
-            myInstance.metadata.name = name;
-            myInstance.metadata.properties = new List<String>();
-
-            foreach (IGH_Param param in component.Params.Input[1].Sources)
-            {
-                var myprop = getPanelNameAndVal(param);
-                if (myprop != null)
-                    myInstance.metadata.properties.Add(myprop);
-            }
-
-            myInstance.geometries = new List<System.Object>();
-
+           
             int k = 0;
 
             foreach (System.Object myObj in inputObjects)
@@ -746,24 +751,49 @@ namespace BetaSpeckle
 
                 // create spk_object
                 SPK_Object myObject = translateGeometryItem(myObj, myguid, name);
-                if (myObject == null) return;
+                myObject.myGeometry = myObj;
+                myObject.computeHash();
+
+                int index = myHashList.IndexOf(myObject.myHash);
+
+                if(index == -1 )
+                {
+                    myHashList.Add(myObject.myHash);
+                    myObject.serialize(FOLDERLOCATION, myHashList.Count() - 1);
+                    mykvp.geometries.Add(myHashList.Count() - 1);
+                }
+                else
+                {
+                    mykvp.geometries.Add(index);
+                }
+
                 // add it to the hashset
+                /*
+                // beware the bs below
                 bool isnew = myHashSet.Add(myObject.myHash);
+                //Console.WriteLine(isnew ? "added to hashset" : "NOT added");
 
                 if ( isnew )
                 {
                     // TODO: write file with geometry
-                    myObject.serialize(FOLDERLOCATION);
+                    myHashList.Add(myObject.myHash);
+
+                    myObject.serialize(FOLDERLOCATION, myHashList.Count() - 1 );
+                    //myInstance.geometries.Add( myHashList.Count() - 1 );
+                    mykvp.geometries.Add( myHashList.Count() - 1 );
+                    
                 }
                 else
                 {
-                    // TODO: nothing
+                    // find object hash in myHashList
+                    //System.Predicate<in>
+                    int index = myHashList.IndexOf(myObject.myHash);
+                    mykvp.geometries.Add(index);
+
+                    //myInstance.geometries.Add(myHashList.Count() - 1);
                 }
-
-                // TODO: add geometry hash to KVP structure (new)
-                mykvp.geometries.Add(myObject.myHash);
-
-                myInstance.geometries.Add( myObject );
+                */
+                
             }
 
             
@@ -778,7 +808,7 @@ namespace BetaSpeckle
                 if (myObj is GH_Mesh)
                 {
                     GH_Mesh tempers = (GH_Mesh)myObj;
-                    SuperMesh mesh = new SuperMesh(tempers, myguid);
+                    SuperMesh mesh = new SuperMesh(tempers, myguid, this);
                     return mesh;
 
                 }
@@ -790,7 +820,7 @@ namespace BetaSpeckle
                     if (myCrv.Degree == 1)
                     {
                         Polyline tempP; myCrv.TryGetPolyline(out tempP);
-                        SuperPolyline polyline = new SuperPolyline(tempP, false, myguid);
+                        SuperPolyline polyline = new SuperPolyline(tempP, false, myguid, this);
                         return polyline;
 
                     }
@@ -803,14 +833,14 @@ namespace BetaSpeckle
 
                         PolylineCurve p = myCrv.ToPolyline(mainSegmentCount, subSegmentCount, maxAngleRadians, maxChordLengthRatio, maxAspectRatio, tolerance, minEdgeLength, maxEdgeLength, keepStartPoint);
                         Polyline pp; p.TryGetPolyline(out pp);
-                        return new SuperPolyline(pp, isClosed, myguid);
+                        return new SuperPolyline(pp, isClosed, myguid, this);
 
                     }
                 }
                 else if (myObj is Point3d)
                 {
                     GH_Point tempers = (GH_Point)myObj;
-                    SuperPoint point = new SuperPoint(tempers, myguid);
+                    SuperPoint point = new SuperPoint(tempers, myguid, this);
                     return point;
 
                 }
@@ -846,7 +876,7 @@ namespace BetaSpeckle
 
                         GH_Mesh temporal = new GH_Mesh(brep_mesh);
 
-                        SuperMesh mesh = new SuperMesh(temporal, myguid);
+                        SuperMesh mesh = new SuperMesh(temporal, myguid, this);
                         return mesh;
                     }
                 }
@@ -867,7 +897,7 @@ namespace BetaSpeckle
 
                         Polyline pp; p.TryGetPolyline(out pp);
                         if (pp != null)
-                            return new SuperPolyline(pp, true, myguid);    
+                            return new SuperPolyline(pp, true, myguid, this);    
                     }
                     
                 }
@@ -875,7 +905,7 @@ namespace BetaSpeckle
                 {
                     GH_Line myLine = myObj as GH_Line;
 
-                    return new SuperPolyline(myLine, myguid);
+                    return new SuperPolyline(myLine, myguid, this);
                 }
                 else
                 {
@@ -884,6 +914,18 @@ namespace BetaSpeckle
             }
             return null;
         }
+
+        public void addToBBox(double x, double y, double z)
+        {
+            if (x > maxx) maxx = x;
+            if (x < minx) minx = x;
+
+            if (y > maxy) maxy = y;
+            if (y < miny) miny = y;
+
+            if (z > maxz) maxz = z;
+            if (z < minz) minz = z;
+         }
 
         #region doubleclickhandler
 

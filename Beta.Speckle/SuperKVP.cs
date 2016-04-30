@@ -25,13 +25,13 @@ namespace BetaSpeckle
     {
         public string key = "";
         public string values = "";
-        public List<string> geometries;
+        public List<int> geometries;
 
         public SuperKVP(string _key, string _values)
         {
             key = _key;
             values = _values;
-            geometries = new List<string>();
+            geometries = new List<int>();
         }
     }
 }

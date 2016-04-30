@@ -17,6 +17,7 @@
  */
 
 
+using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
 using Rhino.Geometry;
 using System;
@@ -24,13 +25,17 @@ using System.Collections.Generic;
 
 namespace BetaSpeckle
 {
+    [Serializable]
     internal class SuperPolyline : SPK_Object
     {
 
         private Point3d[] mypoints;
 
-        public SuperPolyline(Polyline p, bool isClosed, string guid) : base()
+        public SuperPolyline(Polyline p, bool isClosed, string guid, BetaSpeckleComponent parent)  : base()
         {
+
+            this.myGeometry = p.ToArray();
+
             data.type = "SPKL_Polyline";
 
             data.parentGuid = guid;
@@ -51,14 +56,19 @@ namespace BetaSpeckle
                 data.vertices.Add(Math.Round(myPoint.Y * 1, 3));
                 data.vertices.Add(Math.Round(myPoint.Z * 1, 3));
                 data.vertices.Add(Math.Round(myPoint.X * 1, 3));
+
+                parent.addToBBox(myPoint.Y, myPoint.Z, myPoint.X);
+
                 if (k++ < 50) hashText += myPoint.ToString();
             }
 
-            myHash = sha256_hash(hashText);
+            //myHash = sha256_hash(hashText);
         }
 
-        public SuperPolyline(GH_Line line, string guid)
+        public SuperPolyline(GH_Line line, string guid, BetaSpeckleComponent parent) : base() 
         {
+            this.myGeometry = line.Value;
+
             parentGuid = guid;
             data.uvs = "";
             data.normals = "";
@@ -76,10 +86,12 @@ namespace BetaSpeckle
             data.vertices.Add(Math.Round(end.Z * 1, 3));
             data.vertices.Add(Math.Round(end.X * 1, 3));
 
+            parent.addToBBox(start.Y, start.Z, start.X);
+            parent.addToBBox(end.Y, end.Z, end.X);
 
             string hashText = this.type + this.parentGuid + data.isClosed.toString();
             hashText += start.ToString() + end.ToString();
-            myHash = sha256_hash(hashText);
+            //myHash = sha256_hash(hashText);
 
         }
         

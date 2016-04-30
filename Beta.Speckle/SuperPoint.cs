@@ -16,6 +16,7 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
 using Rhino.Geometry;
 using System;
@@ -23,10 +24,13 @@ using System.Collections.Generic;
 
 namespace BetaSpeckle
 {
+    [Serializable]
     internal class SuperPoint : SPK_Object
     {
-        public SuperPoint(GH_Point pp, string guid) : base()
-        { 
+        public SuperPoint(GH_Point pp, string guid, BetaSpeckleComponent parent) : base()
+        {
+            this.myGeometry = pp.Value;
+
             data.type = "SPKL_Point";
 
             data.parentGuid = guid;
@@ -43,7 +47,9 @@ namespace BetaSpeckle
             data.vertices.Add(Math.Round(p.X * 1, 3));
 
             string hashText = this.type + this.parentGuid + p.ToString();
-            myHash = sha256_hash(hashText);
+            //myHash = sha256_hash(hashText);
+
+            parent.addToBBox(p.Y, p.Z, p.X);
         }
     }
 }

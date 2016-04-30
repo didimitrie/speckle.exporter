@@ -16,6 +16,7 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+using Grasshopper.Kernel;
 using Grasshopper.Kernel.Types;
 using Rhino.Geometry;
 using System;
@@ -23,11 +24,13 @@ using System.Collections.Generic;
 
 namespace BetaSpeckle
 {
+    [Serializable]
     internal class SuperMesh : SPK_Object 
     {
 
-        public SuperMesh(GH_Mesh myMesh, string guid) : base()
+        public SuperMesh(GH_Mesh myMesh, string guid, BetaSpeckleComponent parent) : base()
         {
+            this.myGeometry = myMesh.Value;
 
             data.type = "SPKL_Mesh";
 
@@ -56,16 +59,30 @@ namespace BetaSpeckle
                 }
             }
 
+            // hashing logic:
+            // if mesh.vertices.length > 50 sample 50
+            // else sample all
+            // -> need a modifier
+            // Vertices.Count / 50 = 
+
             //  VERTICES
-            int k = 0;
+            int k = 0, i = 0;
             data.vertices = new List<double>();
+
+            hashText += actualMesh.Vertices.Count.ToString();
+
             foreach (Point3d vertex in actualMesh.Vertices)
             {
-                data.vertices.Add(Math.Round(vertex.Y * 1, 3));
-                data.vertices.Add(Math.Round(vertex.Z * 1, 3));
-                data.vertices.Add(Math.Round(vertex.X * 1, 3));
+                data.vertices.Add(Math.Round(vertex.Y, 3));
+                data.vertices.Add(Math.Round(vertex.Z, 3));
+                data.vertices.Add(Math.Round(vertex.X, 3));
+
+                parent.addToBBox(vertex.Y, vertex.Z, vertex.X);
+
                 if (k++ < 50)
-                    hashText += vertex.ToString();
+                    hashText += Math.Round(vertex.Y, 3).ToString() + Math.Round(vertex.Z, 3).ToString() + Math.Round(vertex.X, 3).ToString();
+                    //hashText += vertex.ToString();
+                i++;
             }
 
             // FACES
@@ -93,7 +110,7 @@ namespace BetaSpeckle
                 }
             }
 
-            myHash = sha256_hash(hashText);
+            //myHash = sha256_hash(hashText);
         }
 
         public int ColorToInt(System.Drawing.Color color)

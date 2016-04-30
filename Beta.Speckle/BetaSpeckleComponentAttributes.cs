@@ -37,7 +37,7 @@ namespace BetaSpeckle
         protected override void Layout()
         {
             base.Layout();
-            this.bounds.Inflate(new SizeF(7f, 30f));
+            this.bounds.Inflate(new SizeF(5f, 40f));
         }
 
         protected override void Render(GH_Canvas canvas, Graphics graphics, GH_CanvasChannel channel)
